@@ -1,5 +1,6 @@
 <div align="center">
 
+<h1> SVTRv2-pico </h1>
 <h1> OpenOCR: An Open-Source Toolkit for General-OCR Research and Applications </h1>
 
 <h5 align="center"> If you find this project useful, please give us a star🌟. </h5>
