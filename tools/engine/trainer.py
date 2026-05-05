@@ -4,7 +4,7 @@ import random
 import time
 
 import numpy as np
-import torch.amp
+import torch.cuda.amp as amp
 from tqdm import tqdm
 
 import torch
@@ -61,16 +61,22 @@ class Trainer(object):
         os.makedirs(self.cfg['Global']['output_dir'], exist_ok=True)
 
         self.writer = None
-        if is_main_process(
-        ) and self.cfg['Global']['use_tensorboard'] and 'train' in mode:
-            import wandb
-            from torch.utils.tensorboard import SummaryWriter
-            wandb.init(project='demo-sync-tb',
-                       name=self.cfg['Global'].get('run_name',
-                                                   'log_wandb_openocr'),
-                       sync_tensorboard=True)
+        self.use_wandb = self.cfg['Global'].get('use_wandb', False)
+        if is_main_process() and 'train' in mode:
+            if self.cfg['Global']['use_tensorboard']:
+                import wandb
+                from torch.utils.tensorboard import SummaryWriter
+                self.writer = SummaryWriter(self.cfg['Global']['output_dir'])
 
-            self.writer = SummaryWriter(self.cfg['Global']['output_dir'])
+            if self.use_wandb:
+                import wandb
+                wandb.init(project=self.cfg['Global'].get('wandb_project', 'OpenOCR'),
+                           name=self.cfg['Global'].get('run_name', 'log_wandb_openocr'),
+                           config=self.cfg)
+                # Upload the config file
+                config_file = self.cfg.get('config_file') # This needs to be set in tools/train_rec.py
+                if config_file and os.path.exists(config_file):
+                    wandb.save(config_file)
 
         self.logger = get_logger(
             'openrec' if task == 'rec' else 'opendet',
@@ -155,7 +161,7 @@ class Trainer(object):
                 self.model, [self.local_rank], find_unused_parameters=False)
 
         # amp
-        self.scaler = (torch.amp.GradScaler() if self.cfg['Global'].get(
+        self.scaler = (amp.GradScaler() if self.cfg['Global'].get(
             'use_amp', False) else None)
 
         self.logger.info(
@@ -192,7 +198,12 @@ class Trainer(object):
                 self.model = CMER(config=cfg_model)
         else:
             char_num = self.post_process_class.get_character_num()
-            self.cfg['Architecture']['Decoder']['out_channels'] = char_num
+            if 'Decoder' in self.cfg['Architecture']:
+                self.cfg['Architecture']['Decoder']['out_channels'] = char_num
+            if 'Student' in self.cfg['Architecture'] and 'Decoder' in self.cfg['Architecture']['Student']:
+                self.cfg['Architecture']['Student']['Decoder']['out_channels'] = char_num
+            if 'Teacher' in self.cfg['Architecture'] and 'Decoder' in self.cfg['Architecture']['Teacher']:
+                self.cfg['Architecture']['Teacher']['Decoder']['out_channels'] = char_num
             self.model = build_rec_model(self.cfg['Architecture'])
         # build loss
         self.loss_class = build_rec_loss(self.cfg['Loss'])
@@ -221,7 +232,7 @@ class Trainer(object):
     def set_random_seed(self, seed):
         torch.manual_seed(seed)  # 为CPU设置随机种子
         if self.device.type == 'cuda':
-            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.benchmark = True
             torch.cuda.manual_seed(seed)  # 为当前GPU设置随机种子
             torch.cuda.manual_seed_all(seed)  # 为所有GPU设置随机种子
         random.seed(seed)
@@ -306,14 +317,13 @@ class Trainer(object):
             self.resume_iter = global_step
             iter_model_file_name = os.path.basename(
                 self.cfg['Global']['checkpoints'])
-            last_whole_epoch_global_step = int(iter_model_file_name.split('_')[1])
-            global_step = last_whole_epoch_global_step
+            last_whole_epoch_global_step = iter_model_file_name.split('_')[1]
             self.cfg['Train']['sampler'][
                 'resume_iter'] = self.resume_iter - last_whole_epoch_global_step
 
         last_whole_epoch_global_step = 0
         for epoch in range(start_epoch, epoch_num + 1):
-            if self.cfg['Global'].get('resume_from_iter',
+            if not self.cfg['Global'].get('resume_from_iter',
                                           False):  # for unirec resume training
                 if 'sampler' in self.cfg['Train']:
                     self.cfg['Train']['sampler']['resume_iter'] = 0
@@ -349,8 +359,7 @@ class Trainer(object):
                 train_reader_cost += time.time() - reader_start
                 # use amp
                 if self.scaler:
-                    with torch.amp.autocast(device_type=self.device.type,
-                                            dtype=torch.bfloat16):
+                    with amp.autocast(enabled=True):
                         if self.use_transformers:
                             inputs = {
                                 'pixel_values': batch_tensor[0],
@@ -420,6 +429,10 @@ class Trainer(object):
                 if self.writer is not None:
                     for k, v in train_stats.get().items():
                         self.writer.add_scalar(f'TRAIN/{k}', v, global_step)
+                
+                if self.use_wandb and is_main_process():
+                    import wandb
+                    wandb.log({f'TRAIN/{k}': v for k, v in train_stats.get().items()}, step=global_step)
 
                 if is_main_process() and (
                     (global_step > 0 and global_step % print_batch_step == 0)
@@ -508,6 +521,11 @@ class Trainer(object):
                 if isinstance(v, (float, int)):
                     self.writer.add_scalar(f'EVAL/{k}', cur_metric[k],
                                            global_step)
+        
+        if self.use_wandb and is_main_process():
+            import wandb
+            log_dict = {f'EVAL/{k}': v for k, v in cur_metric.items() if isinstance(v, (float, int))}
+            wandb.log(log_dict, step=global_step)
 
         if (cur_metric[self.eval_class.main_indicator] >=
                 self.best_metric[self.eval_class.main_indicator]):
@@ -530,6 +548,13 @@ class Trainer(object):
                       self.best_metric,
                       is_best=True,
                       prefix=None)
+            
+            if self.use_wandb and is_main_process():
+                import wandb
+                best_path = os.path.join(self.cfg["Global"]["output_dir"], "best.pth")
+                if os.path.exists(best_path):
+                    wandb.save(best_path)
+                    self.logger.info(f"Uploaded best model to WandB: {best_path}")
         best_str = f"best metric, {', '.join(['{}: {}'.format(k, v) for k, v in self.best_metric.items()])}"
         self.logger.info(best_str)
 

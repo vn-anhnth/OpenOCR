@@ -102,7 +102,9 @@ class CTCLabelDecode(BaseRecLabelDecode):
                                              use_space_char)
 
     def __call__(self, preds, batch=None, **kwargs):
-        # preds = preds['res']
+        if isinstance(preds, dict):
+            preds = preds.get('student_predicts', preds)
+        
         if kwargs.get('torch_tensor', True):
             preds = preds.detach().cpu().numpy()
         preds_idx = preds.argmax(axis=2)

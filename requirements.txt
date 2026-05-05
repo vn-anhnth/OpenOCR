@@ -1,5 +1,5 @@
 imgaug
-lmdb
+lmdb==1.5.1
 numpy
 opencv-python
 pyclipper
