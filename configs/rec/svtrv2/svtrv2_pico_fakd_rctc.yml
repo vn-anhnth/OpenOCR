@@ -23,13 +23,13 @@ Global:
 
 Optimizer:
   name: AdamW
-  lr: 0.00065 # for 4gpus bs256/gpu
+  lr: 0.00065
   weight_decay: 0.05
   filter_bias_and_bn: True
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
+  warmup_epoch: 10
   cycle_momentum: False
 
 Architecture:
