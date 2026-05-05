@@ -1,6 +1,6 @@
-imgaug
+imgaug>=0.4.0
 lmdb==1.5.1
-numpy
+numpy<2.0
 opencv-python
 pyclipper
 pyyaml
