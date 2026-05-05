@@ -87,6 +87,8 @@ class RecMetric(object):
                 pred = pred.lower()
                 target = target.lower()
             norm_edit_dis += Levenshtein.normalized_distance(pred, target)
+            self.total_edit_distance += Levenshtein.distance(pred, target)
+            self.total_char_num += len(target)
             if pred == target:
                 correct_num += 1
             all_num += 1
@@ -96,6 +98,7 @@ class RecMetric(object):
         return {
             'acc': correct_num / (all_num + self.eps),
             'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),
+            'cer': self.total_edit_distance / (self.total_char_num + self.eps),
         }
 
     def eval_all_metric(self, pred_label, batch=None, *args, **kwargs):
@@ -146,6 +149,8 @@ class RecMetric(object):
                 target = target.lower()
             dis = Levenshtein.normalized_distance(pred, target)
             norm_edit_dis += dis
+            self.total_edit_distance += Levenshtein.distance(pred, target)
+            self.total_char_num += len(target)
             ratio_i = ratio[all_num] - 1 if ratio[
                 all_num] < self.max_ratio else self.max_ratio - 1
             len_i = max(0, min(self.max_len, len(target)) - 1)
@@ -180,6 +185,7 @@ class RecMetric(object):
         return {
             'acc': correct_num / (all_num + self.eps),
             'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),
+            'cer': self.total_edit_distance / (self.total_char_num + self.eps),
         }
 
     def get_metric(self, training=False):
@@ -193,11 +199,13 @@ class RecMetric(object):
             return self.get_all_metric()
         acc = 1.0 * self.correct_num / (self.all_num + self.eps)
         norm_edit_dis = 1 - self.norm_edit_dis / (self.all_num + self.eps)
+        cer = self.total_edit_distance / (self.total_char_num + self.eps)
         num_samples = self.all_num
         self.reset()
         return {
             'acc': acc,
             'norm_edit_dis': norm_edit_dis,
+            'cer': cer,
             'num_samples': num_samples
         }
 
@@ -219,6 +227,7 @@ class RecMetric(object):
             self.all_num + self.eps)
 
         norm_edit_dis = 1 - self.norm_edit_dis / (self.all_num + self.eps)
+        cer = self.total_edit_distance / (self.total_char_num + self.eps)
         num_samples = self.all_num
         each_len_acc = (self.each_len_correct_num /
                         (self.each_len_num + self.eps)).tolist()
@@ -228,6 +237,8 @@ class RecMetric(object):
         each_len_num = self.each_len_num.tolist()
         each_ratio_acc = (self.each_ratio_correct_num /
                           (self.each_ratio_num + self.eps)).tolist()
+        each_ratio_acc_cer = (self.each_ratio_correct_num /
+                              (self.each_ratio_num + self.eps)).tolist()
         each_ratio_norm_edit_dis = (1 - ((self.each_ratio_norm_edit_dis) / (
             (self.each_ratio_num) + self.eps))).tolist()
         each_ratio_num = self.each_ratio_num.tolist()
@@ -247,6 +258,7 @@ class RecMetric(object):
             'each_ratio_acc': each_ratio_acc,
             'each_ratio_norm_edit_dis': each_ratio_norm_edit_dis,
             'norm_edit_dis': norm_edit_dis,
+            'cer': cer,
             'num_samples': num_samples
         }
 
@@ -254,6 +266,8 @@ class RecMetric(object):
         self.correct_num = 0
         self.all_num = 0
         self.norm_edit_dis = 0
+        self.total_edit_distance = 0
+        self.total_char_num = 0
         self.correct_num_real = 0
         self.correct_num_lower = 0
         self.correct_num_ignore_space = 0

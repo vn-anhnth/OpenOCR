@@ -26,6 +26,7 @@ def parse_args():
 def main():
     FLAGS = parse_args()
     cfg = Config(FLAGS.config)
+    cfg.cfg['config_file'] = FLAGS.config
     FLAGS = vars(FLAGS)
     opt = FLAGS.pop('opt')
     cfg.merge_dict(FLAGS)

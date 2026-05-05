@@ -452,9 +452,10 @@ class OpenRecognizer:
 def main(cfg):
     model = OpenRecognizer(cfg)
 
-    save_res_path = './rec_results/'
-    if not os.path.exists(save_res_path):
-        os.makedirs(save_res_path)
+    save_res_path = cfg['Global'].get('save_res_path', './rec_results/rec_results.txt')
+    save_res_dir = os.path.dirname(save_res_path)
+    if save_res_dir and not os.path.exists(save_res_dir):
+        os.makedirs(save_res_dir)
 
     t_sum = 0
     sample_num = 0
@@ -462,8 +463,7 @@ def main(cfg):
     text_len_time = [0 for _ in range(max_len)]
     text_len_num = [0 for _ in range(max_len)]
 
-    sample_num = 0
-    with open(save_res_path + '/rec_results.txt', 'wb') as fout:
+    with open(save_res_path, 'wb') as fout:
         for file in get_image_file_list(cfg['Global']['infer_img']):
             preds_result = model(img_path=file, batch_num=1)[0]
             rec_text = preds_result['text']
@@ -474,13 +474,16 @@ def main(cfg):
             text_len_time[min(max_len - 1, len(rec_text))] += t_cost
             logger.info(
                 f'{sample_num} {file}\t result: {info}, time cost: {t_cost}')
-            otstr = file + '\t' + info + '\n'
+            otstr = file + '\t' + info + '\t' + str(t_cost) + '\n'
             t_sum += t_cost
             fout.write(otstr.encode())
             sample_num += 1
-        logger.info(
-            f"Results saved to {os.path.join(save_res_path, 'rec_results.txt')}.)"
-        )
+        
+        if sample_num > 0:
+            avg_time_str = f'avg time cost: {t_sum/sample_num}\n'
+            fout.write(avg_time_str.encode())
+
+    logger.info(f"Results saved to {save_res_path}")
 
     print(text_len_num)
     w_avg_t_cost = []
