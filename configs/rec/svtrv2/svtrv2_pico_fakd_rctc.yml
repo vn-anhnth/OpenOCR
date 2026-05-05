@@ -90,7 +90,7 @@ Train:
     name: RatioDataSetTVResize
     ds_width: True
     padding: False
-    data_dir_list: ['./train_data_lmdb/train']
+    data_dir_list: ['/content/ocr-license-plate-lmdb-dataset/train']
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -119,7 +119,7 @@ Eval:
     name: RatioDataSetTVResize
     ds_width: True
     padding: False
-    data_dir_list: ['./train_data_lmdb/val']
+    data_dir_list: ['/content/ocr-license-plate-lmdb-dataset/val']
     transforms:
       - DecodeImagePIL:
           img_mode: RGB
