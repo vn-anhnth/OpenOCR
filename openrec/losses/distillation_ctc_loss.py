@@ -12,8 +12,9 @@ class DistillationCTCLoss(nn.Module):
         self.weight_ctc = weight_ctc
         self.weight_kd = weight_kd
         self.temperature = temperature
-        # Dùng mean để scale loss đều theo batch và sequence length, tránh nổ Loss
-        self.kl_loss = nn.KLDivLoss(reduction='mean')
+        # Phải dùng batchmean để giữ nguyên ý nghĩa xác suất, 
+        # weight_kd=0.1 sẽ tự cân bằng lại với CTC.
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
 
     def forward(self, predicts, batch):
         """
