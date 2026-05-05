@@ -23,7 +23,7 @@ Global:
 
 Optimizer:
   name: AdamW
-  lr: 0.00065
+  lr: 0.0013
   weight_decay: 0.05
   filter_bias_and_bn: True
 
@@ -104,7 +104,7 @@ Train:
   sampler:
     name: RatioSampler
     scales: [[128, 32]] # w, h
-    first_bs: &bs 256
+    first_bs: &bs 1024
     fix_bs: false
     divided_factor: [4, 16] # w, h
     is_training: True
