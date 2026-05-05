@@ -54,7 +54,7 @@ Architecture:
       name: RCTCDecoder
 
   Teacher:
-    pretrained: ./output/rec/svtrv2_tiny_rctc/best.pth
+    pretrained: /content/SVTRv2_many/svtrv2_tiny_rctc/best.pth
     in_channels: 3
     Encoder:
       name: SVTRv2LNConvTwo33
