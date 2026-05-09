@@ -3,18 +3,18 @@ Global:
   epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/svtrv2_tiny_rctc/
+  output_dir: ./output/rec/svtrv2_tiny_fourier_rctc/
   save_epoch_step: [0, 3]
   # evaluation is run every 10 epochs
   eval_epoch_step: [0, 10]
   eval_batch_step: [0, 999999999]
   cal_metric_during_train: True
-  pretrained_model: ./pretrained_models/SVTRv2/best.pth
+  pretrained_model: ./output/rec/svtrv2_tiny_fourier_rctc_old/latest.pth
   checkpoints:
   use_tensorboard: false
   use_wandb: True
   wandb_project: OpenOCR_SVTR_new_method
-  run_name: svtrv2_tiny_rctc
+  run_name: svtrv2_tiny_fourier_rctc
   infer_img:
   # for data or label process
   character_dict_path: &character_dict_path ./tools/utils/license_plate_vn_dict.txt
@@ -55,7 +55,7 @@ Architecture:
     dims: [64, 128, 256]
     depths: [3, 6, 3]
     num_heads: [2, 4, 8]
-    mixer: [['Conv','Conv','Conv'],['Conv','Conv','Conv','FGlobal','Global','Global'],['Global','Global','Global']]
+    mixer: [['Conv','Conv','Fourier'],['Conv','Conv','Fourier','Fourier','Fourier','Fourier'],['Fourier','FGlobal','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false

@@ -155,7 +155,7 @@ class Trainer(object):
                 self.model, [self.local_rank], find_unused_parameters=False)
 
         # amp
-        self.scaler = (torch.amp.GradScaler() if self.cfg['Global'].get(
+        self.scaler = (torch.cuda.amp.GradScaler() if self.cfg['Global'].get(
             'use_amp', False) else None)
 
         self.logger.info(
@@ -192,7 +192,12 @@ class Trainer(object):
                 self.model = CMER(config=cfg_model)
         else:
             char_num = self.post_process_class.get_character_num()
-            self.cfg['Architecture']['Decoder']['out_channels'] = char_num
+            if 'models' in self.cfg['Architecture']:
+                for model_cfg in self.cfg['Architecture']['models']:
+                    name = list(model_cfg.keys())[0]
+                    model_cfg[name]['Decoder']['out_channels'] = char_num
+            else:
+                self.cfg['Architecture']['Decoder']['out_channels'] = char_num
             self.model = build_rec_model(self.cfg['Architecture'])
         # build loss
         self.loss_class = build_rec_loss(self.cfg['Loss'])
@@ -387,7 +392,9 @@ class Trainer(object):
                     self.optimizer.step()
 
                 if cal_metric_during_train:  # only rec and cls need
-                    post_result = self.post_process_class(preds,
+                    # If distillation, preds is a dict. Extract Student for post-process and metrics
+                    preds_for_metric = preds['Student'] if isinstance(preds, dict) else preds
+                    post_result = self.post_process_class(preds_for_metric,
                                                           batch_numpy,
                                                           training=True)
                     self.eval_class(post_result, batch_numpy, training=True)
