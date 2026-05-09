@@ -273,12 +273,12 @@ class FourierUnit2D(nn.Module):
     Fourier Unit for 2D Spatial Features (Frequency Domain).
     """
 
-    def __init__(self, dim, h=32, w=128):
+    def __init__(self, dim, h=8, w=32):
         super(FourierUnit2D, self).__init__()
         self.dim = dim
         self.h = h
         self.w = w
-        # Learnable complex weights: [C, H, W_half, 2]
+        # Smaller spectral filter to save memory, interpolated during forward
         self.weight = nn.Parameter(
             torch.randn(dim, h, w // 2 + 1, 2) * 0.02)
 
