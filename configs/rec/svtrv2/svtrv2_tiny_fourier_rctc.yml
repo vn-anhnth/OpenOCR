@@ -81,7 +81,7 @@ Train:
     batch_size_per_card: 128
     shuffle: True
     drop_last: True
-    num_workers: 0
+    num_workers: 8
     max_ratio: 4
   sampler:
     name: RatioSampler
@@ -109,7 +109,7 @@ Eval:
     batch_size_per_card: 128
     shuffle: False
     drop_last: False
-    num_workers: 0
+    num_workers: 4
     max_ratio: 4
   sampler:
     name: RatioSampler
