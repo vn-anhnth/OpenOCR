@@ -236,3 +236,68 @@ class PatchEmbed(nn.Module):
         ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
+
+
+class FourierUnit(nn.Module):
+    """
+    Fourier Unit for 1D Sequence Features (Frequency Domain).
+    """
+
+    def __init__(self, dim, h=32, w=128):
+        super(FourierUnit, self).__init__()
+        self.dim = dim
+        # Learnerble weights for frequency domain filtering
+        # Since we apply RFFT along the sequence dimension N, output is N//2 + 1
+        # For simplicity, we use a fixed size placeholder that can be interpolated
+        self.weight = nn.Parameter(torch.ones(1, dim, 1, 2) * 0.02)
+
+    def forward(self, x):
+        # Scale weights to match sequence length
+        B, N, C = x.shape
+        x_fft = torch.fft.rfft(x, dim=1, norm='ortho')
+        N_half = x_fft.shape[1]
+        
+        # self.weight is [1, C, 1, 2]
+        w = self.weight.reshape(1, C * 2, 1) # [1, C*2, 1]
+        w = torch.nn.functional.interpolate(w, size=N_half, mode='linear', align_corners=True) # [1, C*2, N_half]
+        w = w.reshape(1, C, 2, N_half).permute(0, 3, 1, 2).contiguous() # [1, N_half, C, 2]
+        w = torch.view_as_complex(w).squeeze(0) # [N_half, C]
+        
+        x_fft = x_fft * w
+        x_out = torch.fft.irfft(x_fft, n=N, dim=1, norm='ortho')
+        return x_out
+
+
+class FourierUnit2D(nn.Module):
+    """
+    Fourier Unit for 2D Spatial Features (Frequency Domain).
+    """
+
+    def __init__(self, dim, h=32, w=128):
+        super(FourierUnit2D, self).__init__()
+        self.dim = dim
+        self.h = h
+        self.w = w
+        # Learnable complex weights: [C, H, W_half, 2]
+        self.weight = nn.Parameter(
+            torch.randn(dim, h, w // 2 + 1, 2) * 0.02)
+
+    def forward(self, x):
+        # x: [B, C, H, W]
+        B, C, H, W = x.shape
+        x_fft = torch.fft.rfft2(x.float(), dim=(-2, -1), norm='ortho')
+
+        # Adaptive weight matching for different spatial resolutions
+        if H != self.h or (W // 2 + 1) != (self.w // 2 + 1):
+            w = self.weight.permute(0, 3, 1, 2)  # [C, 2, h, w_half]
+            w = torch.nn.functional.interpolate(
+                w, size=(H, W // 2 + 1), mode='bilinear', align_corners=True)
+            w = w.permute(0, 2, 3, 1).contiguous()
+            w = torch.view_as_complex(w)
+        else:
+            w = torch.view_as_complex(self.weight)
+
+        x_fft = x_fft * w
+        x = torch.fft.irfft2(x_fft, s=(H, W), dim=(-2, -1), norm='ortho')
+
+        return x.type_as(self.weight)
