@@ -8,7 +8,7 @@ Global:
   eval_epoch_step: [0, 10]
   eval_batch_step: [0, 999999999]
   cal_metric_during_train: True
-  pretrained_model: None
+  pretrained_model: /content/OpenOCR/output/rec/u14m_filter/svtrv2_tiny_rctc/best.pth
   checkpoints:
   use_tensorboard: false
   use_wandb: True

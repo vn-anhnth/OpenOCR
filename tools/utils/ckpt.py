@@ -91,9 +91,20 @@ def load_pretrained_params(model, pretrained_model, logger):
     else:
         state_dict = checkpoint
 
-    model.load_state_dict(state_dict, strict=False)
-    model_keys = model.state_dict().keys()
-    for name in model_keys:
-        if name not in state_dict:
-            logger.info(f"{name} is not in pretrained model")
+    model_state_dict = model.state_dict()
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k in model_state_dict:
+            if v.shape != model_state_dict[k].shape:
+                logger.info(f"Shape mismatch for {k}: skipping loading {k}")
+                continue
+            new_state_dict[k] = v
+        else:
+            logger.info(f"Skipping key {k} as it is not in the model")
+
+    model.load_state_dict(new_state_dict, strict=False)
+    
+    for name in model_state_dict.keys():
+        if name not in new_state_dict:
+            logger.info(f"{name} is not in pretrained model or skipped due to mismatch")
 
