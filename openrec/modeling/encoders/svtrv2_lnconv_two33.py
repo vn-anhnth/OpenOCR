@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn.init import kaiming_normal_, ones_, trunc_normal_, zeros_
 
-from openrec.modeling.common import DropPath, Identity, Mlp
+from openrec.modeling.common import DropPath, Identity, Mlp, FourierUnit
 
 
 class ConvBNLayer(nn.Module):
@@ -90,6 +90,7 @@ class Block(nn.Module):
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
         eps=1e-6,
+        **kwargs,
     ):
         super().__init__()
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -130,9 +131,10 @@ class FlattenBlockRe2D(Block):
                  drop_path=0,
                  act_layer=nn.GELU,
                  norm_layer=nn.LayerNorm,
-                 eps=0.000001):
+                 eps=0.000001,
+                 **kwargs):
         super().__init__(dim, num_heads, mlp_ratio, qkv_bias, qk_scale, drop,
-                         attn_drop, drop_path, act_layer, norm_layer, eps)
+                         attn_drop, drop_path, act_layer, norm_layer, eps, **kwargs)
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -156,6 +158,7 @@ class ConvBlock(nn.Module):
         eps=1e-6,
         num_conv=2,
         kernel_size=3,
+        **kwargs,
     ):
         super().__init__()
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -180,6 +183,53 @@ class ConvBlock(nn.Module):
         x = self.norm1(x.flatten(2).transpose(1, 2))
         x = self.norm2(x + self.drop_path(self.mlp(x)))
         x = x.transpose(1, 2).reshape(-1, C, H, W)
+        return x
+
+
+class FourierBlock(nn.Module):
+
+    def __init__(
+        self,
+        dim,
+        h=32,
+        w=128,
+        num_heads=None, # for compatibility
+        mlp_ratio=4.0,
+        drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        eps=1e-6,
+        **kwargs,
+    ):
+        super().__init__()
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.norm1 = norm_layer(dim, eps=eps)
+        self.mixer = FourierUnit(dim, h=h, w=w)
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else Identity()
+        self.norm2 = norm_layer(dim, eps=eps)
+        self.mlp = Mlp(
+            in_features=dim,
+            hidden_features=mlp_hidden_dim,
+            act_layer=act_layer,
+            drop=drop,
+        )
+
+    def forward(self, x):
+        # x: [B, C, H, W]
+        C, H, W = x.shape[1:]
+        
+        # 1. Fourier Global Mixing
+        # FourierUnit processes [B, C, H, W]
+        x = x + self.drop_path(self.mixer(x))
+        
+        # 2. MLP branch
+        # We flatten to [B, N, C] for LayerNorm and MLP
+        x_flat = x.flatten(2).transpose(1, 2)
+        x_flat = x_flat + self.drop_path(self.mlp(self.norm2(self.norm1(x_flat))))
+        
+        # Reshape back to 2D
+        x = x_flat.transpose(1, 2).reshape(-1, C, H, W)
         return x
 
 
@@ -266,6 +316,8 @@ class SVTRStage(nn.Module):
                  eps=1e-6,
                  num_conv=[2] * 3,
                  downsample=None,
+                 h=8,
+                 w=32,
                  **kwargs):
         super().__init__()
         self.dim = dim
@@ -292,9 +344,13 @@ class SVTRStage(nn.Module):
                     self.blocks.append(FlattenTranspose())
                 elif mixer[i] == 'FGlobalRe2D':
                     block = FlattenBlockRe2D
+                elif mixer[i] == 'Fourier':
+                    block = FourierBlock
                 self.blocks.append(
                     block(
                         dim=dim,
+                        h=h,
+                        w=w,
                         num_heads=num_heads,
                         mlp_ratio=mlp_ratio,
                         qkv_bias=qkv_bias,
@@ -308,7 +364,7 @@ class SVTRStage(nn.Module):
                     ))
 
         if downsample:
-            if mixer[-1] == 'Conv' or mixer[-1] == 'FGlobalRe2D':
+            if mixer[-1] == 'Conv' or mixer[-1] == 'FGlobalRe2D' or mixer[-1] == 'Fourier':
                 self.downsample = SubSample2D(dim, out_dim, stride=sub_k)
             else:
                 self.downsample = SubSample1D(dim, out_dim, stride=sub_k)
@@ -457,6 +513,7 @@ class SVTRv2LNConvTwo33(nn.Module):
                           sum(depths))  # stochastic depth decay rule
 
         self.stages = nn.ModuleList()
+        cur_h, cur_w = feat_max_size
         for i_stage in range(num_stages):
             stage = SVTRStage(
                 dim=dims[i_stage],
@@ -480,8 +537,12 @@ class SVTRv2LNConvTwo33(nn.Module):
                 eps=eps,
                 num_conv=num_convs[i_stage] if len(num_convs[i_stage]) == len(
                     mixer[i_stage]) else [2] * len(mixer[i_stage]),
+                h=cur_h,
+                w=cur_w,
             )
             self.stages.append(stage)
+            cur_h = cur_h // sub_k[i_stage][0]
+            cur_w = cur_w // sub_k[i_stage][1]
 
         self.out_channels = self.num_features
         self.last_stage = last_stage

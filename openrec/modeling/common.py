@@ -236,3 +236,46 @@ class PatchEmbed(nn.Module):
         ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
+
+
+class FourierUnit(nn.Module):
+    """
+    Fourier Unit for Frequency-Domain Feature Enhancement.
+    Processes features in frequency domain using a learnable global filter.
+    Useful for capturing global context and denoising/sharpening blurred features.
+    """
+
+    def __init__(self, dim, h=32, w=128):
+        super(FourierUnit, self).__init__()
+        self.dim = dim
+        self.h = h
+        self.w = w
+        # Learnable complex weights for frequency domain
+        # rfft2 output size for (h, w) is (h, w//2 + 1)
+        self.weight = nn.Parameter(
+            torch.randn(dim, h, w // 2 + 1, 2) * 0.02)
+
+    def forward(self, x):
+        # x: [B, C, H, W]
+        B, C, H, W = x.shape
+
+        # 1. Transform to Frequency Domain
+        x_fft = torch.fft.rfft2(x.float(), dim=(-2, -1), norm='ortho')
+
+        # 2. Scale learnable weights to match current feature map size
+        if H != self.h or (W // 2 + 1) != (self.w // 2 + 1):
+            w = self.weight.permute(0, 3, 1, 2)  # [C, 2, h, w_half]
+            w = torch.nn.functional.interpolate(
+                w, size=(H, W // 2 + 1), mode='bilinear', align_corners=True)
+            w = w.permute(0, 2, 3, 1).contiguous()
+            w = torch.view_as_complex(w)
+        else:
+            w = torch.view_as_complex(self.weight)
+
+        # 3. Apply Filter
+        x_fft = x_fft * w
+
+        # 4. Transform back to Spatial Domain
+        x = torch.fft.irfft2(x_fft, s=(H, W), dim=(-2, -1), norm='ortho')
+
+        return x.type_as(self.weight)

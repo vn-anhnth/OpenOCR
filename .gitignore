@@ -43,3 +43,6 @@ gradio_outputs/
 openocr_test_images/
 openocr_output/
 test_output/
+env/
+pretrained_models/
+train_data_lmdb/

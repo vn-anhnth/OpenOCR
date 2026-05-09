@@ -86,16 +86,20 @@ class RecMetric(object):
             if self.is_lower:
                 pred = pred.lower()
                 target = target.lower()
+            dis = Levenshtein.distance(pred, target)
             norm_edit_dis += Levenshtein.normalized_distance(pred, target)
             if pred == target:
                 correct_num += 1
             all_num += 1
+            self.total_ed += dis
+            self.total_len += len(target)
         self.correct_num += correct_num
         self.all_num += all_num
         self.norm_edit_dis += norm_edit_dis
         return {
             'acc': correct_num / (all_num + self.eps),
             'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),
+            'cer': self.total_ed / (self.total_len + self.eps),
         }
 
     def eval_all_metric(self, pred_label, batch=None, *args, **kwargs):
@@ -193,11 +197,13 @@ class RecMetric(object):
             return self.get_all_metric()
         acc = 1.0 * self.correct_num / (self.all_num + self.eps)
         norm_edit_dis = 1 - self.norm_edit_dis / (self.all_num + self.eps)
+        cer = self.total_ed / (self.total_len + self.eps)
         num_samples = self.all_num
         self.reset()
         return {
             'acc': acc,
             'norm_edit_dis': norm_edit_dis,
+            'cer': cer,
             'num_samples': num_samples
         }
 
@@ -219,6 +225,7 @@ class RecMetric(object):
             self.all_num + self.eps)
 
         norm_edit_dis = 1 - self.norm_edit_dis / (self.all_num + self.eps)
+        cer = self.total_ed / (self.total_len + self.eps)
         num_samples = self.all_num
         each_len_acc = (self.each_len_correct_num /
                         (self.each_len_num + self.eps)).tolist()
@@ -240,6 +247,7 @@ class RecMetric(object):
             'acc_ignore_space_lower': acc_ignore_space_lower,
             'acc_ignore_space_symbol': acc_ignore_space_symbol,
             'acc_ignore_space_lower_symbol': acc,
+            'cer': cer,
             'each_len_num': each_len_num,
             'each_len_acc': each_len_acc,
             'each_len_norm_edit_dis': each_len_norm_edit_dis,
@@ -268,3 +276,5 @@ class RecMetric(object):
             [0 for _ in range(self.max_ratio)])
         self.each_ratio_norm_edit_dis = np.array(
             [0. for _ in range(self.max_ratio)])
+        self.total_ed = 0
+        self.total_len = 0
