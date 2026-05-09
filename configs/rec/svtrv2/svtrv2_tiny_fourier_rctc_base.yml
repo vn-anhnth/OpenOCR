@@ -85,7 +85,7 @@ Train:
       - KeepKeys:
           keep_keys: ['image', 'label', 'length']
   loader:
-    batch_size_per_card: 1024
+    batch_size_per_card: 2048
     shuffle: True
     drop_last: True
     num_workers: 8
@@ -93,7 +93,7 @@ Train:
   sampler:
     name: RatioSampler
     is_training: True
-    first_bs: 1024
+    first_bs: 2048
     divided_factor: [4, 16]
     scales: [[128, 32]]
 
@@ -120,7 +120,7 @@ Eval:
       - KeepKeys:
           keep_keys: ['image', 'label', 'length']
   loader:
-    batch_size_per_card: 1024
+    batch_size_per_card: 2048
     shuffle: False
     drop_last: False
     num_workers: 4
@@ -128,6 +128,6 @@ Eval:
   sampler:
     name: RatioSampler
     is_training: False
-    first_bs: 1024
+    first_bs: 2048
     divided_factor: [4, 16]
     scales: [[128, 32]]
