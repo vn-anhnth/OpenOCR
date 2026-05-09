@@ -1,0 +1,133 @@
+Global:
+  device: gpu
+  epoch_num: 20
+  log_smooth_window: 20
+  print_batch_step: 10
+  output_dir: ./output/rec/u14m_filter/svtrv2_tiny_rctc/
+  save_epoch_step: [15, 1]
+  # evaluation is run every 2000 iterations
+  eval_epoch_step: [0, 1]
+  eval_batch_step: [0, 500]
+  cal_metric_during_train: True
+  pretrained_model:
+  checkpoints:
+  use_tensorboard: false
+  infer_img:
+  # for data or label process
+  character_dict_path: &character_dict_path ./tools/utils/EN_symbol_dict.txt
+  max_text_length: &max_text_length 25
+  use_space_char: &use_space_char False
+  save_res_path: ./output/rec/u14m_filter/predicts_svtrv2_rctc.txt
+  use_amp: True
+
+Optimizer:
+  name: AdamW
+  lr: 0.00065 # for 4gpus bs256/gpu
+  weight_decay: 0.05
+  filter_bias_and_bn: True
+
+LRScheduler:
+  name: OneCycleLR
+  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
+  cycle_momentum: False
+
+Architecture:
+  model_type: rec
+  algorithm: SVTRv2
+  Transform:
+  Encoder:
+    name: SVTRv2LNConvTwo33
+    use_pos_embed: False
+    dims: [48, 96, 192]
+    depths: [3, 6, 3]
+    num_heads: [3, 6, 12]
+    # Replace all Global Attention with Fourier
+    mixer: [['Conv','Conv','Fourier'],['Conv','Conv','Conv','Fourier','Fourier','Fourier'],['Fourier1D','Fourier1D','Fourier1D']]
+    local_k: [[5, 5], [5, 5], [-1, -1]]
+    sub_k: [[1, 1], [2, 1], [-1, -1]]
+    last_stage: false
+    feat2d: True
+  Decoder:
+    name: RCTCDecoder
+
+Loss:
+  name: CTCLoss
+  zero_infinity: True
+
+PostProcess:
+  name: CTCLabelDecode
+
+Metric:
+  name: RecMetric
+  main_indicator: acc
+  is_filter: True
+
+Train:
+  dataset:
+    name: RatioDataSetTVResize
+    ds_width: True
+    padding: False
+    data_dir_list: [
+      '/content/OpenOCR-Data/Union14M-L-LMDB-Filtered/filter_train_challenging',
+      '/content/OpenOCR-Data/Union14M-L-LMDB-Filtered/filter_train_hard',
+      '/content/OpenOCR-Data/Union14M-L-LMDB-Filtered/filter_train_medium',
+      '/content/OpenOCR-Data/Union14M-L-LMDB-Filtered/filter_train_normal',
+      '/content/OpenOCR-Data/Union14M-L-LMDB-Filtered/filter_train_easy',
+    ]
+    transforms:
+      - DecodeImagePIL: # load image
+          img_mode: RGB
+      - PARSeqAugPIL:
+      - CTCLabelEncode: # Class handling label
+          character_dict_path: *character_dict_path
+          use_space_char: *use_space_char
+          max_text_length: *max_text_length
+      - KeepKeys:
+          keep_keys: ['image', 'label', 'length']
+  loader:
+    batch_size_per_card: 128
+    shuffle: True
+    drop_last: True
+    num_workers: 8
+    max_ratio: 4
+  sampler:
+    name: RatioSampler
+    is_training: True
+    first_bs: 128
+    divided_factor: [4, 16]
+    scales: [[128, 32]]
+
+Eval:
+  dataset:
+    name: RatioDataSetTVResize
+    ds_width: True
+    padding: False
+    data_dir_list: [
+      '/content/OpenOCR-Data/evaluation/CUTE80',
+      '/content/OpenOCR-Data/evaluation/IC13_857',
+      '/content/OpenOCR-Data/evaluation/IC15_1811',
+      '/content/OpenOCR-Data/evaluation/IIIT5k',
+      '/content/OpenOCR-Data/evaluation/SVT',
+      '/content/OpenOCR-Data/evaluation/SVTP',
+      ]
+    transforms:
+      - DecodeImagePIL: # load image
+          img_mode: RGB
+      - CTCLabelEncode: # Class handling label
+          character_dict_path: *character_dict_path
+          use_space_char: *use_space_char
+          max_text_length: *max_text_length
+      - KeepKeys:
+          keep_keys: ['image', 'label', 'length']
+  loader:
+    batch_size_per_card: 128
+    shuffle: False
+    drop_last: False
+    num_workers: 4
+    max_ratio: 4
+  sampler:
+    name: RatioSampler
+    is_training: False
+    first_bs: 128
+    divided_factor: [4, 16]
+    scales: [[128, 32]]
