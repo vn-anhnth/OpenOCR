@@ -1,10 +1,10 @@
 Global:
   device: gpu
-  epoch_num: 150
+  epoch_num: 300
   log_smooth_window: 20
   print_batch_step: 10
   output_dir: ./output/rec/svtrv2_tiny_fourier_rctc_distill/
-  save_epoch_step: [0, 3]
+  save_epoch_step: [0, 10]
   eval_epoch_step: [0, 10]
   eval_batch_step: [0, 999999999]
   cal_metric_during_train: True
@@ -79,8 +79,8 @@ Loss:
   distill_loss_config:
     name: DistillKL
     weight: 1.0
-    temperature: 2.0
-    feat_weight: 1.0
+    temperature: 1.0
+    feat_weight: 0.1
     teacher_name: Teacher
     student_name: Student
 
