@@ -4,17 +4,14 @@ Global:
   log_smooth_window: 20
   print_batch_step: 10
   output_dir: ./output/rec/svtrv2_tiny_rctc/
-  save_epoch_step: [0, 3]
-  # evaluation is run every 10 epochs
-  eval_epoch_step: [0, 10]
-  eval_batch_step: [0, 999999999]
+  save_epoch_step: [15, 1]
+  # evaluation is run every 2000 iterations
+  eval_epoch_step: [0, 1]
+  eval_batch_step: [0, 500]
   cal_metric_during_train: True
-  pretrained_model: /content/SVTRv2_many/SVTRv2/best.pth
+  pretrained_model:
   checkpoints:
   use_tensorboard: false
-  use_wandb: True
-  wandb_project: OpenOCR_SVTR_new_method
-  run_name: svtrv2_tiny_rctc
   infer_img:
   # for data or label process
   character_dict_path: &character_dict_path ./tools/utils/license_plate_vn_dict.txt
@@ -31,13 +28,8 @@ Optimizer:
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 10
+  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
   cycle_momentum: False
-
-# LRScheduler:
-#   name: OneCycleLR
-#   warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
-#   cycle_momentum: False
 
 Architecture:
   model_type: rec
@@ -47,11 +39,11 @@ Architecture:
     name: SVTRv2LNConvTwo33
     use_pos_embed: False
     dims: [64, 128, 256]
-    depths: [2, 4, 2]
+    depths: [3, 6, 3]
     num_heads: [2, 4, 8]
-    mixer: [['Conv','Conv'],['Conv','Conv','FGlobal','Global'],['Global','Global']]
+    mixer: [['Conv','Conv','Conv'],['Conv','Conv','Conv','FGlobal','Global','Global'],['Global','Global','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
-    sub_k: [[2, 1], [2, 1], [-1, -1]]
+    sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
     feat2d: True
   Decoder:
@@ -98,7 +90,7 @@ Train:
     batch_size_per_card: *bs
     drop_last: True
     max_ratio: 4
-    num_workers: 0
+    num_workers: 4
 
 Eval:
   dataset:
@@ -128,4 +120,4 @@ Eval:
     drop_last: False
     batch_size_per_card: *bs
     max_ratio: 4
-    num_workers: 0
+    num_workers: 4
