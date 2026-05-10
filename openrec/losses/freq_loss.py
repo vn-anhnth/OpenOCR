@@ -49,6 +49,12 @@ class FreqLoss(nn.Module):
         
         # 4. Loss on Magnitude
         # We use Log-scale or squared magnitude to emphasize differences
-        loss = F.mse_loss(torch.abs(s_high), torch.abs(t_high))
+        freq_loss = F.mse_loss(torch.abs(s_high), torch.abs(t_high))
         
-        return loss
+        # 5. Spatial MSE Loss (Feature Alignment)
+        # This helps the student learn the overall semantic structure
+        feat_loss = F.mse_loss(student_feat, teacher_feat)
+        
+        # Balance the two losses
+        # Freq loss is usually larger, so we scale it down or scale feat_loss up
+        return freq_loss + 0.5 * feat_loss

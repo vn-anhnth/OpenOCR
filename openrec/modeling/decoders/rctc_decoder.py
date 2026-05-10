@@ -104,3 +104,24 @@ class SimpleRCTCDecoder(nn.Module):
             result = predicts
 
         return result
+
+
+class VerticalAggregatorRCTCDecoder(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(VerticalAggregatorRCTCDecoder, self).__init__()
+        # Robust learnable vertical aggregator
+        # Works with height 4, 5, etc.
+        self.vertical_aggregator = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=(3, 1), groups=in_channels, padding=(1, 0)),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d((1, None))
+        )
+        self.fc = nn.Linear(in_channels, out_channels)
+
+    def forward(self, x, data=None):
+        # x shape: [B, C, H, W]
+        x = self.vertical_aggregator(x) # [B, C, 1, W]
+        x = x.squeeze(2).transpose(1, 2) # [B, W, C]
+        x = self.fc(x)
+        return x
