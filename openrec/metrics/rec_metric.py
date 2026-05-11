@@ -90,6 +90,25 @@ class RecMetric(object):
         # But for now, let's just make sure we extract strings correctly and filter garbage.
 
         debug_count = 0
+        
+        # SVTRv2 returns [GTC_pred, CTC_pred]
+        # and 'labels' is actually the full 'batch' list [image, label, length, ...]
+        if isinstance(labels, (list, tuple)) and len(labels) > 1:
+            # batch[1] is usually the ground truth labels list
+            # We must be careful if it's a tensor or a list of strings
+            labels = labels[1]
+
+        if isinstance(preds, (list, tuple)) and len(preds) > 0:
+            # If preds is [GTC_list, CTC_list], pick GTC_list
+            if isinstance(preds[0], (list, tuple)) and len(preds[0]) == len(labels):
+                preds = preds[0]
+            # Special case for some multi-head outputs
+            elif len(preds) == len(labels):
+                pass # Already flat
+            else:
+                # Emergency fallback: if preds is just one head
+                pass
+
         for pred_item, label_item in zip(preds, labels):
             pred = unwrap(pred_item)
             target = unwrap(label_item)
@@ -102,6 +121,9 @@ class RecMetric(object):
             if debug_count < 10:
                 from tools.utils.logging import get_logger
                 logger = get_logger()
+                # RAW DEBUG: See what is exactly inside the items
+                logger.info(f"DEBUG_RAW - PredType: {type(pred_item)} | TargetType: {type(label_item)}")
+                logger.info(f"DEBUG_RAW - PredRaw: {pred_item} | TargetRaw: {label_item}")
                 logger.info(f"DEBUG_FIXED - Pred: [{pred}] | Target: [{target}]")
                 debug_count += 1
 
