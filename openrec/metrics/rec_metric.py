@@ -76,25 +76,24 @@ class RecMetric(object):
         total_edit_dis = 0.0
         total_char_len = 0
         
+        def unwrap(item):
+            """Recursively unwrap tuples/lists to get the raw string."""
+            if isinstance(item, (list, tuple)):
+                if len(item) > 0:
+                    return unwrap(item[0])
+                return ""
+            return str(item)
+
         # Emergency Debug: Print first 10 samples to find why Acc is 0
         debug_count = 0
         for pred_item, label_item in zip(preds, labels):
-            # Robust unpacking for pred
-            if isinstance(pred_item, (list, tuple)) and len(pred_item) >= 2:
-                pred, pred_conf = pred_item[:2]
-            else:
-                pred, pred_conf = pred_item, 1.0
-            
-            # Robust unpacking for label
-            if isinstance(label_item, (list, tuple)):
-                target = label_item[0]
-            else:
-                target = label_item
+            pred = unwrap(pred_item)
+            target = unwrap(label_item)
 
             if debug_count < 10:
                 from tools.utils.logging import get_logger
                 logger = get_logger()
-                logger.info(f"DEBUG_MATCH - Pred: [{pred}] | Target: [{target}]")
+                logger.info(f"DEBUG_FIXED - Pred: [{pred}] | Target: [{target}]")
                 debug_count += 1
 
             if self.ignore_space:
