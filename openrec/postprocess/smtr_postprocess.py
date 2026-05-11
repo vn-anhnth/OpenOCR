@@ -26,7 +26,7 @@ class SMTRLabelDecode(BaseRecLabelDecode):
         if isinstance(preds, list):
             preds = preds[-1]
         if isinstance(preds, torch.Tensor):
-            preds = preds.detach().cpu().numpy()
+            preds = preds.detach().cpu().float().numpy()
         preds_idx = preds.argmax(axis=2)
         preds_prob = preds.max(axis=2)
         text = self.decode(preds_idx, preds_prob, is_remove_duplicate=False)
@@ -34,6 +34,7 @@ class SMTRLabelDecode(BaseRecLabelDecode):
             return text
         label = batch[1]
         label = self.decode(label[:, 1:])
+        label = [(l, 1.0) for l in label]
         return text, label
 
     def add_special_char(self, dict_character):

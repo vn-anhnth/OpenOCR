@@ -23,6 +23,8 @@ name_to_module = {
     'MDiffLoss': '.mdiff_loss',
     'UniRecLoss': '.unirec_loss',
     'CMERLoss': '.cmer_loss',
+    'FreqLoss': '.freq_loss',
+    'IDLoss': '.id_loss',
 }
 
 

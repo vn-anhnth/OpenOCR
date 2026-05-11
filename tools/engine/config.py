@@ -117,7 +117,7 @@ class Config(object):
         _, ext = os.path.splitext(file_path)
         assert ext in ['.yml', '.yaml'], 'only support yaml files for now'
 
-        with open(file_path) as f:
+        with open(file_path, encoding='utf-8') as f:
             file_cfg = yaml.load(f, Loader=yaml.Loader)
 
         # NOTE: cfgs outside have higher priority than cfgs in _BASE_
@@ -131,7 +131,7 @@ class Config(object):
                     base_yml = os.path.join(os.path.dirname(file_path),
                                             base_yml)
 
-                with open(base_yml) as f:
+                with open(base_yml, encoding='utf-8') as f:
                     base_cfg = self._load_config_with_base(base_yml)
                     all_base_cfg = _merge_dict(all_base_cfg, base_cfg)
 
@@ -154,5 +154,5 @@ class Config(object):
     def save(self, p, cfg=None):
         if cfg is None:
             cfg = self.cfg
-        with open(p, 'w') as f:
+        with open(p, 'w', encoding='utf-8') as f:
             yaml.dump(dict(cfg), f, default_flow_style=False, sort_keys=False)

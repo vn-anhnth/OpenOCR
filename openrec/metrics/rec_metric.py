@@ -75,13 +75,22 @@ class RecMetric(object):
         norm_edit_dis = 0.0
         total_edit_dis = 0.0
         total_char_len = 0
-        for (pred, pred_conf), (target, _) in zip(preds, labels):
-            if self.stream:
-                assert len(labels) == 1
-                pred, _ = stream_match(preds)
+        for pred_item, label_item in zip(preds, labels):
+            # Robust unpacking for pred
+            if isinstance(pred_item, (list, tuple)) and len(pred_item) >= 2:
+                pred, pred_conf = pred_item[:2]
+            else:
+                pred, pred_conf = pred_item, 1.0
+            
+            # Robust unpacking for label
+            if isinstance(label_item, (list, tuple)):
+                target = label_item[0]
+            else:
+                target = label_item
+
             if self.ignore_space:
-                pred = pred.replace(' ', '')
-                target = target.replace(' ', '')
+                pred = str(pred).replace(' ', '')
+                target = str(target).replace(' ', '')
             if self.is_filter:
                 pred = self._normalize_text(pred)
                 target = self._normalize_text(target)
