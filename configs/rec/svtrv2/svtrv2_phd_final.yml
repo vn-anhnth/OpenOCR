@@ -81,11 +81,11 @@ Distill:
   FreqLoss:
     name: FreqLoss
     hp_ratio: 0.1
-  freq_weight: 0.5 # Reduced slightly to let SGM lead
+  freq_weight: 0.05 # Reduced significantly to prevent KD from dominating
 
 Loss:
   name: GTCLoss
-  ctc_weight: 0.1 #λ1 = 0.1 theo chuyên gia
+  ctc_weight: 1.0 # Restored to 1.0 to prioritize recognition accuracy
   gtc_loss:
     name: SMTRLoss
 
