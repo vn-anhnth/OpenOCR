@@ -20,7 +20,7 @@ Global:
 
 Optimizer:
   name: AdamW
-  lr: 0.0001625 # Hạ LR để finetune chuẩn xác hơn
+  lr: 0.0001 # Finetune siêu chậm để giữ ổn định
   weight_decay: 0.05
   filter_bias_and_bn: True
 
@@ -81,11 +81,12 @@ Distill:
   FreqLoss:
     name: FreqLoss
     hp_ratio: 0.1
-  freq_weight: 0.5 # Tăng áp lực KD để học nét chữ mờ
+  freq_weight: 0.1 # KD nhẹ nhàng hỗ trợ nét chữ
 
 Loss:
   name: GTCLoss
-  ctc_weight: 0.1 # Trả về 0.1 để kích hoạt sức mạnh SGM sửa lỗi 1 ký tự
+  ctc_weight: 1.0 # Trả về 1.0 để giữ vững nền tảng nhận diện
+  gtc_weight: 2.0 # Tăng ưu tiên SGM bằng cách nhân đôi trọng số thay vì hạ CTC
   gtc_loss:
     name: SMTRLoss
 
