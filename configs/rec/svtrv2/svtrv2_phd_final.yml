@@ -81,11 +81,11 @@ Distill:
   FreqLoss:
     name: FreqLoss
     hp_ratio: 0.1
-  freq_weight: 1.0
+  freq_weight: 0.5 # Reduced slightly to let SGM lead
 
 Loss:
   name: GTCLoss
-  ctc_weight: 1.0
+  ctc_weight: 0.1 #λ1 = 0.1 theo chuyên gia
   gtc_loss:
     name: SMTRLoss
 
@@ -123,7 +123,7 @@ Train:
           keep_keys: ['image', 'label', 'label_subs', 'label_next', 'length_subs', 'label_subs_pre', 'label_next_pre', 'length_subs_pre', 'length', 'ctc_label', 'ctc_length']
   sampler:
     name: RatioSampler
-    scales: [[128, 32]]
+    scales: [[128, 32], [96, 32], [64, 48]]
     first_bs: &bs 256
     fix_bs: false
     divided_factor: [4, 16]
@@ -154,7 +154,7 @@ Eval:
           keep_keys: ['image', 'label', 'length', 'ctc_label', 'ctc_length']
   sampler:
     name: RatioSampler
-    scales: [[128, 32]]
+    scales: [[128, 32], [96, 32], [64, 48]]
     first_bs: 256
     fix_bs: false
     divided_factor: [4, 16]
