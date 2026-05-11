@@ -81,11 +81,11 @@ Distill:
   FreqLoss:
     name: FreqLoss
     hp_ratio: 0.1
-  freq_weight: 0.5 # λ_Freq tăng lên 0.5 theo chuyên gia
+  freq_weight: 0.05 # Reduced significantly to prevent KD from dominating
 
 Loss:
   name: GTCLoss
-  ctc_weight: 0.1 # λ1 = 0.1 bắt buộc theo SVTRv2 paper
+  ctc_weight: 1.0 # Restored to 1.0 to prioritize recognition accuracy
   gtc_loss:
     name: SMTRLoss
 
@@ -124,7 +124,7 @@ Train:
   sampler:
     name: RatioSampler
     scales: [[128, 32], [96, 32], [64, 32], [48, 48]] # Đủ 4 bucket MSR chuẩn
-    first_bs: &bs 1024
+    first_bs: &bs 256
     fix_bs: false
     divided_factor: [4, 16]
     is_training: True
@@ -155,7 +155,7 @@ Eval:
   sampler:
     name: RatioSampler
     scales: [[128, 32], [96, 32], [64, 32], [48, 48]] # Đủ 4 bucket MSR chuẩn
-    first_bs: 1024
+    first_bs: 256
     fix_bs: false
     divided_factor: [4, 16]
     is_training: False
