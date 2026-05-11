@@ -132,11 +132,15 @@ class RecMetric(object):
         self.total_edit_dis += total_edit_dis
         self.total_char_len += total_char_len
         
-        # Return GLOBAL average
+        # Safety check: if all samples were filtered out in this batch
+        if all_num == 0:
+            return {'acc': 0.0, 'norm_edit_dis': 0.0, 'cer': 0.0}
+
+        # Return CURRENT BATCH average for logging
         return {
-            'acc': self.correct_num / (self.all_num + self.eps),
-            'norm_edit_dis': 1 - self.norm_edit_dis / (self.all_num + self.eps),
-            'cer': self.total_edit_dis / (self.total_char_len + self.eps),
+            'acc': correct_num / (all_num + self.eps),
+            'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),
+            'cer': total_edit_dis / (total_char_len + self.eps),
         }
 
     def eval_all_metric(self, pred_label, batch=None, *args, **kwargs):
