@@ -130,7 +130,7 @@ Eval:
           img_mode: RGB
       - GTCLabelEncode:
           gtc_label_encode:
-            name: SMTRLabelEncode
+            name: LicensePlateSMTRLabelEncode
             sub_str_len: *subsl
           character_dict_path: *character_dict_path
           use_space_char: *use_space_char

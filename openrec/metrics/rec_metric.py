@@ -115,16 +115,19 @@ class RecMetric(object):
             if pred == target:
                 correct_num += 1
             all_num += 1
+
+        # Accumulate globally
         self.correct_num += correct_num
         self.all_num += all_num
         self.norm_edit_dis += norm_edit_dis
         self.total_edit_dis += total_edit_dis
         self.total_char_len += total_char_len
         
+        # Return GLOBAL average
         return {
-            'acc': correct_num / (all_num + self.eps),
-            'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),
-            'cer': total_edit_dis / (total_char_len + self.eps),
+            'acc': self.correct_num / (self.all_num + self.eps),
+            'norm_edit_dis': 1 - self.norm_edit_dis / (self.all_num + self.eps),
+            'cer': self.total_edit_dis / (self.total_char_len + self.eps),
         }
 
     def eval_all_metric(self, pred_label, batch=None, *args, **kwargs):
