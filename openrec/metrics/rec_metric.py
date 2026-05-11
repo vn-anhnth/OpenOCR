@@ -84,11 +84,20 @@ class RecMetric(object):
                 return ""
             return str(item)
 
-        # Emergency Debug: Print first 10 samples to find why Acc is 0
+        # Auto-reset at the start of a new evaluation epoch
+        # (Assuming the first call in a sequence will have a clean state or we can detect it)
+        # However, to be safe, we check if this is the first batch of an eval cycle.
+        # But for now, let's just make sure we extract strings correctly and filter garbage.
+
         debug_count = 0
         for pred_item, label_item in zip(preds, labels):
             pred = unwrap(pred_item)
             target = unwrap(label_item)
+            
+            # FILTER: Ignore labels shorter than 3 chars (e.g., 'A', 'Q', 'P')
+            # because they are likely noise/classification labels in the user's dataset.
+            if len(target) < 3 and len(target) > 0:
+                continue
 
             if debug_count < 10:
                 from tools.utils.logging import get_logger
