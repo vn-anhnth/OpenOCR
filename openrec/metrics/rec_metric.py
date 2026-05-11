@@ -75,6 +75,9 @@ class RecMetric(object):
         norm_edit_dis = 0.0
         total_edit_dis = 0.0
         total_char_len = 0
+        
+        # Emergency Debug: Print first 10 samples to find why Acc is 0
+        debug_count = 0
         for pred_item, label_item in zip(preds, labels):
             # Robust unpacking for pred
             if isinstance(pred_item, (list, tuple)) and len(pred_item) >= 2:
@@ -87,6 +90,12 @@ class RecMetric(object):
                 target = label_item[0]
             else:
                 target = label_item
+
+            if debug_count < 10:
+                from tools.utils.logging import get_logger
+                logger = get_logger()
+                logger.info(f"DEBUG_MATCH - Pred: [{pred}] | Target: [{target}]")
+                debug_count += 1
 
             if self.ignore_space:
                 pred = str(pred).replace(' ', '')
