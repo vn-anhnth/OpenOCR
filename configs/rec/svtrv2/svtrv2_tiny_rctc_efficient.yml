@@ -3,7 +3,7 @@ Global:
   epoch_num: 100
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/svtrv2_tiny_rctc/
+  output_dir: ./output/rec/svtrv2_tiny_rctc_efficient/
   save_epoch_step: [15, 1]
   # evaluation is run every 2000 iterations
   eval_epoch_step: [0, 1]
@@ -47,7 +47,8 @@ Architecture:
     last_stage: false
     feat2d: True
   Decoder:
-    name: RCTCDecoder
+    name: EfficientRCTCDecoder
+    bottleneck_channels: 128
 
 Loss:
   name: CTCLoss
