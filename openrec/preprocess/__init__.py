@@ -98,6 +98,7 @@ MODULE_MAPPING = {
     'IGTRLabelEncode': '.igtr_label_encode',
     'MGPLabelEncode': '.mgp_label_encode',
     'SMTRLabelEncode': '.smtr_label_encode',
+    'LicensePlateSMTRLabelEncode': '.license_plate_smtr_label_encode',
     'SRNLabelEncode': '.srn_label_encode',
     'VisionLANLabelEncode': '.visionlan_label_encode',
     'CAMLabelEncode': '.cam_label_encode',
@@ -161,11 +162,17 @@ class GTCLabelEncode():
                  character_dict_path=None,
                  use_space_char=False,
                  **kwargs):
+        # Avoid duplicate arguments when unpacking
+        gtc_params = copy.deepcopy(gtc_label_encode)
+        for k in ['name', 'max_text_length', 'character_dict_path', 'use_space_char']:
+            if k in gtc_params:
+                del gtc_params[k]
+                
         self.gtc_label_encode = dynamic_import(gtc_label_encode['name'])(
             max_text_length=max_text_length,
             character_dict_path=character_dict_path,
             use_space_char=use_space_char,
-            **gtc_label_encode)
+            **gtc_params)
         self.ctc_label_encode = dynamic_import('CTCLabelEncode')(
             max_text_length, character_dict_path, use_space_char)
 

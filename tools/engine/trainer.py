@@ -160,6 +160,36 @@ class Trainer(object):
 
         self.logger.info(
             f'run with torch {torch.__version__} and device {self.device}')
+        
+        self._init_aux_losses()
+
+    def _init_aux_losses(self):
+        self.aux_losses = {}
+        if 'AuxLoss' not in self.cfg:
+            return
+            
+        self.logger.info('Initializing Auxiliary Losses (CVPR 2023 Strategy)...')
+        aux_cfg = self.cfg['AuxLoss']
+        
+        from openrec.losses import build_loss
+        if 'IDLoss' in aux_cfg:
+            self.aux_losses['id_loss'] = build_loss(aux_cfg['IDLoss'])
+            self.id_weight = aux_cfg.get('id_weight', 1.0)
+            self.logger.info(f"IDLoss enabled with weight {self.id_weight}")
+            
+            # Feature registry for hooks
+            self.student_feats = {}
+            def get_hook(registry, name):
+                def hook(model, input, output):
+                    registry[name] = output
+                return hook
+
+            # Register hooks for Encoder Stage features (mixer output)
+            for name, module in self.model.named_modules():
+                if 'encoder' in name and 'mixer' in name:
+                     # This captures the local/global features before pooling
+                     module.register_forward_hook(get_hook(self.student_feats, name))
+                     self.logger.info(f"Registered feature hook for IDLoss on: {name}")
 
     def _init_rec_model(self):
         from openrec.losses import build_loss as build_rec_loss
@@ -364,6 +394,22 @@ class Trainer(object):
                             preds = self.model(batch_tensor[0],
                                                data=batch_tensor[1:])
                         loss = self.loss_class(preds, batch_tensor)
+                        
+                        # Auxiliary Losses (IDLoss)
+                        if self.aux_losses:
+                            for l_name, l_func in self.aux_losses.items():
+                                if l_name == 'id_loss':
+                                    # Compute average IDLoss across all captured features
+                                    total_id_loss = 0
+                                    count = 0
+                                    for f_name in self.student_feats:
+                                        total_id_loss += l_func(self.student_feats[f_name])
+                                        count += 1
+                                    if count > 0:
+                                        id_loss = (total_id_loss / count) * self.id_weight
+                                        loss['loss'] += id_loss
+                                        loss['id_loss'] = id_loss
+                        
                         loss['loss'] = loss['loss'] / self.accumulation_steps
                     self.scaler.scale(loss['loss']).backward()
                     if (global_step + 1) % self.accumulation_steps == 0:

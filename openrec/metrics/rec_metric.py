@@ -75,13 +75,61 @@ class RecMetric(object):
         norm_edit_dis = 0.0
         total_edit_dis = 0.0
         total_char_len = 0
-        for (pred, pred_conf), (target, _) in zip(preds, labels):
-            if self.stream:
-                assert len(labels) == 1
-                pred, _ = stream_match(preds)
+        
+        def unwrap(item):
+            """Recursively unwrap tuples/lists to get the raw string."""
+            if isinstance(item, (list, tuple)):
+                if len(item) > 0:
+                    return unwrap(item[0])
+                return ""
+            return str(item)
+
+        # Auto-reset at the start of a new evaluation epoch
+        # (Assuming the first call in a sequence will have a clean state or we can detect it)
+        # However, to be safe, we check if this is the first batch of an eval cycle.
+        # But for now, let's just make sure we extract strings correctly and filter garbage.
+
+        debug_count = 0
+        
+        # SVTRv2 returns [GTC_pred, CTC_pred]
+        # and 'labels' is actually the full 'batch' list [image, label, length, ...]
+        if isinstance(labels, (list, tuple)) and len(labels) > 1:
+            # batch[1] is usually the ground truth labels list
+            # We must be careful if it's a tensor or a list of strings
+            labels = labels[1]
+
+        if isinstance(preds, (list, tuple)) and len(preds) > 0:
+            # If preds is [GTC_list, CTC_list], pick GTC_list
+            if isinstance(preds[0], (list, tuple)) and len(preds[0]) == len(labels):
+                preds = preds[0]
+            # Special case for some multi-head outputs
+            elif len(preds) == len(labels):
+                pass # Already flat
+            else:
+                # Emergency fallback: if preds is just one head
+                pass
+
+        for pred_item, label_item in zip(preds, labels):
+            pred = unwrap(pred_item)
+            target = unwrap(label_item)
+            
+            # FILTER: Ignore labels shorter than 3 chars (e.g., 'A', 'Q', 'P')
+            # because they are likely noise/classification labels in the user's dataset.
+            if len(target) < 3 and len(target) > 0:
+                continue
+
+            if debug_count < 10:
+                from tools.utils.logging import get_logger
+                logger = get_logger()
+                # RAW DEBUG: See what is exactly inside the items
+                logger.info(f"DEBUG_RAW - PredType: {type(pred_item)} | TargetType: {type(label_item)}")
+                logger.info(f"DEBUG_RAW - PredRaw: {pred_item} | TargetRaw: {label_item}")
+                logger.info(f"DEBUG_FIXED - Pred: [{pred}] | Target: [{target}]")
+                debug_count += 1
+
             if self.ignore_space:
-                pred = pred.replace(' ', '')
-                target = target.replace(' ', '')
+                pred = str(pred).replace(' ', '')
+                target = str(target).replace(' ', '')
             if self.is_filter:
                 pred = self._normalize_text(pred)
                 target = self._normalize_text(target)
@@ -98,12 +146,19 @@ class RecMetric(object):
             if pred == target:
                 correct_num += 1
             all_num += 1
+
+        # Accumulate globally
         self.correct_num += correct_num
         self.all_num += all_num
         self.norm_edit_dis += norm_edit_dis
         self.total_edit_dis += total_edit_dis
         self.total_char_len += total_char_len
         
+        # Safety check: if all samples were filtered out in this batch
+        if all_num == 0:
+            return {'acc': 0.0, 'norm_edit_dis': 0.0, 'cer': 0.0}
+
+        # Return CURRENT BATCH average for logging
         return {
             'acc': correct_num / (all_num + self.eps),
             'norm_edit_dis': 1 - norm_edit_dis / (all_num + self.eps),

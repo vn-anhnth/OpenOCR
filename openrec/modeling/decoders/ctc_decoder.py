@@ -201,3 +201,23 @@ class CTCDecoder(nn.Module):
             result = predicts
 
         return result
+
+
+class SimpleRCTCDecoder(nn.Module):
+    """
+    Simplified RCTC Decoder without the heavy Feature Rearrangement Module (FRM).
+    Uses AdaptiveAvgPool2d to collapse height and a Linear layer for prediction.
+    """
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(SimpleRCTCDecoder, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, None))
+        self.fc = nn.Linear(in_channels, out_channels)
+        self.out_channels = out_channels
+
+    def forward(self, x, data=None):
+        # x: [B, C, H, W]
+        x = self.avg_pool(x).squeeze(2).transpose(1, 2) # [B, W, C]
+        predicts = self.fc(x)
+        if not self.training:
+            predicts = F.softmax(predicts, dim=2)
+        return predicts

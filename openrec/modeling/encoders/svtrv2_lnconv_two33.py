@@ -142,6 +142,35 @@ class FlattenBlockRe2D(Block):
         return x
 
 
+class PerceptibilityAttention(nn.Module):
+    """
+    Perceptibility Attention Module (PAM) based on Chai et al. (CVPR 2023).
+    Focuses on both channel and spatial dimensions to extract discriminative 
+    features from blurred images.
+    """
+    def __init__(self, dim, reduction=8):
+        super().__init__()
+        self.channel_attn = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(dim, dim // reduction, kernel_size=1),
+            nn.GELU(),
+            nn.Conv2d(dim // reduction, dim, kernel_size=1),
+            nn.Sigmoid()
+        )
+        self.spatial_attn = nn.Sequential(
+            nn.Conv2d(dim, 1, kernel_size=3, padding=1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # x: [B, C, H, W]
+        ca = self.channel_attn(x)
+        x = x * ca
+        sa = self.spatial_attn(x)
+        x = x * sa
+        return x
+
+
 class ConvBlock(nn.Module):
 
     def __init__(
@@ -156,6 +185,7 @@ class ConvBlock(nn.Module):
         eps=1e-6,
         num_conv=2,
         kernel_size=3,
+        use_pam=True, # Enable PAM by default for this new strategy
     ):
         super().__init__()
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -165,6 +195,7 @@ class ConvBlock(nn.Module):
                 dim, dim, kernel_size, 1, kernel_size // 2, groups=num_heads)
             for i in range(num_conv)
         ])
+        self.pam = PerceptibilityAttention(dim) if use_pam else Identity()
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else Identity()
         self.norm2 = norm_layer(dim, eps=eps)
         self.mlp = Mlp(
@@ -176,7 +207,12 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         C, H, W = x.shape[1:]
-        x = x + self.drop_path(self.mixer(x))
+        # Apply Mixer followed by PAM
+        mixer_out = self.mixer(x)
+        if hasattr(self, 'pam'):
+            mixer_out = self.pam(mixer_out)
+            
+        x = x + self.drop_path(mixer_out)
         x = self.norm1(x.flatten(2).transpose(1, 2))
         x = self.norm2(x + self.drop_path(self.mlp(x)))
         x = x.transpose(1, 2).reshape(-1, C, H, W)
