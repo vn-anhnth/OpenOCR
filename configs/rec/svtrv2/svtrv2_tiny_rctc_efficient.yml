@@ -58,9 +58,9 @@ Architecture:
     name: SVTRv2LNConvTwo33
     use_pos_embed: False
     dims: [64, 128, 256]
-    depths: [2, 4, 2]
+    depths: [3, 5, 2]
     num_heads: [2, 4, 8]
-    mixer: [['Conv','Conv'], ['Conv','Conv','FGlobal','Global'], ['Global','Global']]
+    mixer: [['Conv','Conv','Conv'],['Conv','Conv','Conv','FGlobal','Global'],['Global','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
