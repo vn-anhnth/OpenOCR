@@ -172,12 +172,10 @@ class RepBlock(nn.Module):
         self.rbr_identity = nn.BatchNorm2d(dim)
         self.act = act_layer()
 
-    def forward(self, x, return_pre_act=False):
+    def forward(self, x):
         if hasattr(self, 'rbr_reparam'):
-            out = self.rbr_reparam(x)
-            return out if return_pre_act else self.act(out)
-        out = self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x)
-        return out if return_pre_act else self.act(out)
+            return self.act(self.rbr_reparam(x))
+        return self.act(self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x))
 
     def switch_to_deploy(self):
         if hasattr(self, 'rbr_reparam'):
@@ -212,71 +210,6 @@ class RepBlock(nn.Module):
         std = (running_var + eps).sqrt()
         t = (gamma / std).reshape(-1, 1, 1, 1)
         return kernel * t, beta - running_mean * gamma / std
-
-
-class MoERepBlock(nn.Module):
-    """Degradation-Aware Mixture of Experts RepVGG Block (DA-MoE).
-    Router dynamically predicts weights to blend the output of two experts:
-    expert_clear and expert_blur.
-    """
-    def __init__(self, dim, act_layer=nn.GELU, **kwargs):
-        super().__init__()
-        self.expert_clear = RepBlock(dim, act_layer, **kwargs)
-        self.expert_blur = RepBlock(dim, act_layer, **kwargs)
-        
-        # Lightweight Degradation-Aware Router
-        # AvgPool is low-pass (smooths info), MaxPool captures sharp edges (high-frequency).
-        # We need BOTH to accurately distinguish blur from clear.
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
-        
-        self.router_fc = nn.Sequential(
-            nn.Linear(dim * 2, dim // 4, bias=False),
-            act_layer(),
-            nn.Linear(dim // 4, 2, bias=False),
-            nn.Softmax(dim=1)
-        )
-
-    def forward(self, x):
-        # x is [B, C, H, W]
-        x_avg = self.avg_pool(x).flatten(1)
-        x_max = self.max_pool(x).flatten(1)
-        weights = self.router_fc(torch.cat([x_avg, x_max], dim=1)) # [B, 2]
-        
-        # --- DYNAMIC KERNEL FUSION (CONDCONV) FOR ULTRA-FAST DEPLOYMENT ---
-        # If model is in deploy mode and batch_size == 1
-        if not self.training and x.shape[0] == 1 and hasattr(self.expert_clear, 'rbr_reparam'):
-            w_clear, w_blur = weights[0, 0], weights[0, 1]
-            
-            # Blend the weights and bias mathematically BEFORE convolution
-            dynamic_weight = w_clear * self.expert_clear.rbr_reparam.weight + w_blur * self.expert_blur.rbr_reparam.weight
-            dynamic_bias = w_clear * self.expert_clear.rbr_reparam.bias + w_blur * self.expert_blur.rbr_reparam.bias
-            
-            # Apply exactly ONE convolution
-            import torch.nn.functional as F
-            out = F.conv2d(x, dynamic_weight, dynamic_bias, 
-                           stride=self.expert_clear.rbr_reparam.stride, 
-                           padding=self.expert_clear.rbr_reparam.padding,
-                           groups=self.expert_clear.rbr_reparam.groups)
-                           
-            return self.expert_clear.act(out)
-            
-        # --- STANDARD FORWARD FOR TRAINING OR BATCHED INFERENCE ---
-        # Blend BEFORE activation to match CondConv mathematics
-        out_clear_pre = self.expert_clear(x, return_pre_act=True)
-        out_blur_pre = self.expert_blur(x, return_pre_act=True)
-        
-        weights = weights.view(-1, 2, 1, 1)
-        mixed_pre_act = weights[:, 0:1] * out_clear_pre + weights[:, 1:2] * out_blur_pre
-        
-        return self.expert_clear.act(mixed_pre_act)
-
-    def switch_to_deploy(self):
-        # Fuse internal RepBlocks
-        if hasattr(self.expert_clear, 'switch_to_deploy'):
-            self.expert_clear.switch_to_deploy()
-        if hasattr(self.expert_blur, 'switch_to_deploy'):
-            self.expert_blur.switch_to_deploy()
 
 
 class ConvBlock(nn.Module):
@@ -426,15 +359,13 @@ class SVTRStage(nn.Module):
                     block = Block
                 elif mixer[i] == 'Rep':
                     block = RepBlock
-                elif mixer[i] == 'MoERep':
-                    block = MoERepBlock
                 elif mixer[i] == 'FGlobal':
                     block = Block
                     self.blocks.append(FlattenTranspose())
                 elif mixer[i] == 'FGlobalRe2D':
                     block = FlattenBlockRe2D
                 
-                if mixer[i] in ('Rep', 'MoERep'):
+                if mixer[i] == 'Rep':
                     self.blocks.append(
                         block(
                             dim=dim,
@@ -457,7 +388,7 @@ class SVTRStage(nn.Module):
                         ))
 
         if downsample:
-            if mixer[-1] in ('Conv', 'FGlobalRe2D', 'Rep', 'MoERep'):
+            if mixer[-1] in ('Conv', 'FGlobalRe2D', 'Rep'):
                 self.downsample = SubSample2D(dim, out_dim, stride=sub_k)
             else:
                 self.downsample = SubSample1D(dim, out_dim, stride=sub_k)
@@ -599,7 +530,7 @@ class SVTRv2LNConvTwo33(nn.Module):
                                  feat_max_size=feat_max_size,
                                  embed_dim=dims[0],
                                  use_pos_embed=use_pos_embed,
-                                 flatten=mixer[0][0] not in ('Conv', 'Rep', 'MoERep'),
+                                 flatten=mixer[0][0] not in ('Conv', 'Rep'),
                                  bias=pope_bias)
 
         dpr = np.linspace(0, drop_path_rate,
