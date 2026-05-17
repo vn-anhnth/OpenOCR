@@ -38,17 +38,17 @@ Architecture:
   Encoder:
     name: SVTRv2LNConvTwo33
     use_pos_embed: False
-    dims: [48, 96, 192]
+    dims: [64, 128, 256]
     depths: [3, 6, 3]
-    num_heads: [3, 6, 12]
-    # Replace all Global Attention with Fourier
-    mixer: [['Conv','Conv','Fourier'],['Conv','Conv','Conv','Fourier','Fourier','Fourier'],['Fourier1D','Fourier1D','Fourier1D']]
+    num_heads: [2, 4, 8]
+    mixer: [['Rep','Rep','Rep'],['Rep','Rep','Rep','FGlobal','Global','Global'],['Global','Global','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
     feat2d: True
   Decoder:
-    name: RCTCDecoder
+    name: EfficientRCTCDecoder
+    bottleneck_channels: 128
 
 Loss:
   name: CTCLoss
