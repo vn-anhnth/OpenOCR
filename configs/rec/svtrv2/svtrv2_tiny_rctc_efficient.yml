@@ -60,7 +60,7 @@ Architecture:
     dims: [64, 128, 256]
     depths: [2, 4, 2]
     num_heads: [2, 4, 8]
-    mixer: [['Conv','Conv'], ['Conv','Conv','FGlobal','Global'], ['Global','Global']]
+    mixer: [['Conv','Conv','Conv'],['Conv','Conv','Conv','HFA','HFA','HFA'],['FGlobal','Global','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
