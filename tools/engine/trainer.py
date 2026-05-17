@@ -1,3 +1,4 @@
+import copy
 import datetime
 import os
 import random
@@ -8,6 +9,7 @@ import torch.amp
 from tqdm import tqdm
 
 import torch
+from torch import nn
 import torch.distributed
 from tools.data import build_dataloader
 from tools.utils.ckpt import load_ckpt, save_ckpt
@@ -160,6 +162,68 @@ class Trainer(object):
 
         self.logger.info(
             f'run with torch {torch.__version__} and device {self.device}')
+        
+        self._init_distill()
+
+    def _init_distill(self):
+        self.distill = 'Distill' in self.cfg
+        if not self.distill:
+            return
+        
+        self.logger.info('Initializing Knowledge Distillation...')
+        distill_cfg = self.cfg['Distill']
+        
+        # Build Teacher
+        from openrec.modeling import build_model
+        teacher_cfg = copy.deepcopy(distill_cfg['Teacher'])
+        self.teacher_model = build_model(teacher_cfg)
+        
+        # Load Teacher Weights
+        teacher_path = distill_cfg.get('teacher_path', None)
+        if teacher_path and os.path.exists(teacher_path):
+            checkpoint = torch.load(teacher_path, map_location='cpu')
+            if 'state_dict' in checkpoint:
+                checkpoint = checkpoint['state_dict']
+            # Filter weights for teacher if needed (though usually teacher matches its own arch)
+            self.teacher_model.load_state_dict(checkpoint, strict=False)
+            self.logger.info(f"Loaded Teacher model from {teacher_path}")
+        
+        self.teacher_model = self.teacher_model.to(self.device)
+        self.teacher_model.eval()
+        for p in self.teacher_model.parameters():
+            p.requires_grad = False
+            
+        # Build Distill Losses
+        from openrec.losses import build_loss
+        self.distill_losses = {}
+        if 'FreqLoss' in distill_cfg:
+            self.distill_losses['freq_loss'] = build_loss(distill_cfg['FreqLoss'])
+            self.freq_weight = distill_cfg.get('freq_weight', 1.0)
+            self.logger.info(f"FreqLoss enabled with weight {self.freq_weight}")
+        
+        # Feature registry for hooks
+        self.student_feats = {}
+        self.teacher_feats = {}
+        
+        def get_hook(registry, name):
+            def hook(model, input, output):
+                registry[name] = output
+            return hook
+
+        # Register hooks for Local Mixing (ConvBlock.mixer)
+        # We target the first ConvBlock of the first stage for simplicity, 
+        # or we can iterate through all ConvBlocks.
+        # Let's find modules named 'mixer' inside ConvBlocks.
+        for name, module in self.model.named_modules():
+            if 'encoder' in name and 'mixer' in name and isinstance(module, nn.Sequential):
+                 # This is likely a ConvBlock mixer
+                 module.register_forward_hook(get_hook(self.student_feats, name))
+                 self.logger.info(f"Registered student hook on: {name}")
+
+        for name, module in self.teacher_model.named_modules():
+            if 'encoder' in name and 'mixer' in name and isinstance(module, nn.Sequential):
+                 module.register_forward_hook(get_hook(self.teacher_feats, name))
+                 self.logger.info(f"Registered teacher hook on: {name}")
 
     def _init_rec_model(self):
         from openrec.losses import build_loss as build_rec_loss
@@ -363,7 +427,38 @@ class Trainer(object):
                         else:
                             preds = self.model(batch_tensor[0],
                                                data=batch_tensor[1:])
+                        
                         loss = self.loss_class(preds, batch_tensor)
+                        
+                        # Knowledge Distillation
+                        if self.distill:
+                            with torch.no_grad():
+                                # Standard SVTRv2 only takes images as first arg
+                                self.teacher_model(batch_tensor[0], data=batch_tensor[1:])
+                            
+                            distill_loss = 0
+                            if 'freq_loss' in self.distill_losses:
+                                # We sum losses over all matched hooks
+                                f_loss = 0
+                                count = 0
+                                # Match student and teacher features by name suffix or stage index
+                                # For simplicity, we compare all that exist in both
+                                for s_name in self.student_feats:
+                                    # Find corresponding teacher feature (they might have different prefixes)
+                                    # Assuming same architecture structure
+                                    suffix = s_name.split('encoder.')[-1]
+                                    for t_name in self.teacher_feats:
+                                        if t_name.endswith(suffix):
+                                            f_loss += self.distill_losses['freq_loss'](
+                                                self.student_feats[s_name], 
+                                                self.teacher_feats[t_name]
+                                            )
+                                            count += 1
+                                if count > 0:
+                                    f_loss = f_loss / count
+                                    loss['loss'] += f_loss * self.freq_weight
+                                    loss['freq_kd_loss'] = f_loss * self.freq_weight
+                        
                         loss['loss'] = loss['loss'] / self.accumulation_steps
                     self.scaler.scale(loss['loss']).backward()
                     if (global_step + 1) % self.accumulation_steps == 0:
@@ -390,6 +485,8 @@ class Trainer(object):
                     post_result = self.post_process_class(preds,
                                                           batch_numpy,
                                                           training=True)
+                    if isinstance(post_result, (list, tuple)) and len(post_result) == 2 and isinstance(post_result[0], (list, tuple)):
+                        post_result = post_result[1]
                     self.eval_class(post_result, batch_numpy, training=True)
                     metric = self.eval_class.get_metric()
                     train_stats.update(metric)
@@ -561,6 +658,8 @@ class Trainer(object):
                 # Obtain usable results from post-processing methods
                 # Evaluate the results of the current batch
                 post_result = self.post_process_class(preds, batch_numpy)
+                if isinstance(post_result, (list, tuple)) and len(post_result) == 2 and isinstance(post_result[0], (list, tuple)):
+                    post_result = post_result[1]
                 self.eval_class(post_result, batch_numpy)
 
                 pbar.update(1)

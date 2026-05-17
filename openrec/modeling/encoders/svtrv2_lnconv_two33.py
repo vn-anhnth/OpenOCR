@@ -176,7 +176,9 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         C, H, W = x.shape[1:]
-        x = x + self.drop_path(self.mixer(x))
+        # Extract features after mixer for Freq-KD
+        mixer_out = self.mixer(x)
+        x = x + self.drop_path(mixer_out)
         x = self.norm1(x.flatten(2).transpose(1, 2))
         x = self.norm2(x + self.drop_path(self.mlp(x)))
         x = x.transpose(1, 2).reshape(-1, C, H, W)

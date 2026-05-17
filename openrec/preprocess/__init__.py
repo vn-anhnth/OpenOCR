@@ -98,6 +98,7 @@ MODULE_MAPPING = {
     'IGTRLabelEncode': '.igtr_label_encode',
     'MGPLabelEncode': '.mgp_label_encode',
     'SMTRLabelEncode': '.smtr_label_encode',
+    'LicensePlateSMTRLabelEncode': '.license_plate_smtr_label_encode',
     'SRNLabelEncode': '.srn_label_encode',
     'VisionLANLabelEncode': '.visionlan_label_encode',
     'CAMLabelEncode': '.cam_label_encode',

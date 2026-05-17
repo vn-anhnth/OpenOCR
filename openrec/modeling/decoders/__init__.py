@@ -9,6 +9,7 @@ class_to_module = {
     'CDistNetDecoder': '.cdistnet_decoder',
     'CPPDDecoder': '.cppd_decoder',
     'RCTCDecoder': '.rctc_decoder',
+    'SimpleRCTCDecoder': '.rctc_decoder',
     'CTCDecoder': '.ctc_decoder',
     'DANDecoder': '.dan_decoder',
     'IGTRDecoder': '.igtr_decoder',
@@ -71,7 +72,10 @@ class GTCDecoder(nn.Module):
             self.gtc_decoder = build_decoder(gtc_decoder)
         else:
             ctc_decoder['in_channels'] = in_channels
-            ctc_decoder['out_channels'] = out_channels
+            if isinstance(out_channels, (list, tuple)):
+                ctc_decoder['out_channels'] = out_channels[1]
+            else:
+                ctc_decoder['out_channels'] = out_channels
         self.ctc_decoder = build_decoder(ctc_decoder)
 
     def forward(self, x, data=None):

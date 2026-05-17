@@ -68,3 +68,39 @@ class RCTCDecoder(nn.Module):
             result = predicts
 
         return result
+
+
+class SimpleRCTCDecoder(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 out_channels=6625,
+                 return_feats=False,
+                 **kwargs):
+        super(SimpleRCTCDecoder, self).__init__()
+        self.fc = nn.Linear(
+            in_channels,
+            out_channels,
+            bias=True,
+        )
+        self.out_channels = out_channels
+        self.return_feats = return_feats
+
+    def forward(self, x, data=None):
+        # x: [B, C, H, W]
+        # Height-wise average pooling
+        # SVTRv2 characteristic: features are [B, C, H, W]
+        feats = x.mean(dim=2)  # [B, C, W]
+        feats = feats.permute(0, 2, 1)  # [B, W, C]
+
+        predicts = self.fc(feats)
+
+        if self.return_feats:
+            result = (feats, predicts)
+        else:
+            result = predicts
+
+        if not self.training:
+            predicts = F.softmax(predicts, dim=2)
+            result = predicts
+
+        return result
