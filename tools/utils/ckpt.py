@@ -91,15 +91,19 @@ def load_pretrained_params(model, pretrained_model, logger):
     else:
         state_dict = checkpoint
 
+    # --- BẮT ĐẦU ĐOẠN CODE LỌC SHAPE (BỎ QUA FC LỆCH CLASS) ---
     model_state_dict = model.state_dict()
     new_state_dict = {}
     for k, v in state_dict.items():
+        # Nếu layer có trong model nhưng kích thước (shape) không khớp (VD: 95 vs 38)
         if k in model_state_dict and v.shape != model_state_dict[k].shape:
-            logger.info(f"Shape mismatch for {k}: model needs {model_state_dict[k].shape}, checkpoint has {v.shape}. Skipping.")
+            logger.info(f"Shape mismatch cho {k}: model cần {model_state_dict[k].shape}, pretrained có {v.shape}. Bỏ qua!")
         else:
             new_state_dict[k] = v
-
-    model.load_state_dict(state_dict, strict=False)
+    # Load state_dict đã được lọc
+    model.load_state_dict(new_state_dict, strict=False)
+    # --- KẾT THÚC ĐOẠN CODE LỌC SHAPE ---
+    
     model_keys = model.state_dict().keys()
     for name in model_keys:
         if name not in state_dict:
