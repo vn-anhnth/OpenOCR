@@ -172,10 +172,12 @@ class RepBlock(nn.Module):
         self.rbr_identity = nn.BatchNorm2d(dim)
         self.act = act_layer()
 
-    def forward(self, x):
+    def forward(self, x, return_pre_act=False):
         if hasattr(self, 'rbr_reparam'):
-            return self.act(self.rbr_reparam(x))
-        return self.act(self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x))
+            out = self.rbr_reparam(x)
+            return out if return_pre_act else self.act(out)
+        out = self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x)
+        return out if return_pre_act else self.act(out)
 
     def switch_to_deploy(self):
         if hasattr(self, 'rbr_reparam'):
@@ -222,11 +224,14 @@ class MoERepBlock(nn.Module):
         self.expert_clear = RepBlock(dim, act_layer, **kwargs)
         self.expert_blur = RepBlock(dim, act_layer, **kwargs)
         
-        # Lightweight Router
-        self.router = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(dim, dim // 4, bias=False),
+        # Lightweight Degradation-Aware Router
+        # AvgPool is low-pass (smooths info), MaxPool captures sharp edges (high-frequency).
+        # We need BOTH to accurately distinguish blur from clear.
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        
+        self.router_fc = nn.Sequential(
+            nn.Linear(dim * 2, dim // 4, bias=False),
             act_layer(),
             nn.Linear(dim // 4, 2, bias=False),
             nn.Softmax(dim=1)
@@ -234,12 +239,37 @@ class MoERepBlock(nn.Module):
 
     def forward(self, x):
         # x is [B, C, H, W]
-        weights = self.router(x) # [B, 2]
-        out_clear = self.expert_clear(x)
-        out_blur = self.expert_blur(x)
+        x_avg = self.avg_pool(x).flatten(1)
+        x_max = self.max_pool(x).flatten(1)
+        weights = self.router_fc(torch.cat([x_avg, x_max], dim=1)) # [B, 2]
+        
+        # --- DYNAMIC KERNEL FUSION (CONDCONV) FOR ULTRA-FAST DEPLOYMENT ---
+        # If model is in deploy mode and batch_size == 1
+        if not self.training and x.shape[0] == 1 and hasattr(self.expert_clear, 'rbr_reparam'):
+            w_clear, w_blur = weights[0, 0], weights[0, 1]
+            
+            # Blend the weights and bias mathematically BEFORE convolution
+            dynamic_weight = w_clear * self.expert_clear.rbr_reparam.weight + w_blur * self.expert_blur.rbr_reparam.weight
+            dynamic_bias = w_clear * self.expert_clear.rbr_reparam.bias + w_blur * self.expert_blur.rbr_reparam.bias
+            
+            # Apply exactly ONE convolution
+            import torch.nn.functional as F
+            out = F.conv2d(x, dynamic_weight, dynamic_bias, 
+                           stride=self.expert_clear.rbr_reparam.stride, 
+                           padding=self.expert_clear.rbr_reparam.padding,
+                           groups=self.expert_clear.rbr_reparam.groups)
+                           
+            return self.expert_clear.act(out)
+            
+        # --- STANDARD FORWARD FOR TRAINING OR BATCHED INFERENCE ---
+        # Blend BEFORE activation to match CondConv mathematics
+        out_clear_pre = self.expert_clear(x, return_pre_act=True)
+        out_blur_pre = self.expert_blur(x, return_pre_act=True)
         
         weights = weights.view(-1, 2, 1, 1)
-        return weights[:, 0:1] * out_clear + weights[:, 1:2] * out_blur
+        mixed_pre_act = weights[:, 0:1] * out_clear_pre + weights[:, 1:2] * out_blur_pre
+        
+        return self.expert_clear.act(mixed_pre_act)
 
     def switch_to_deploy(self):
         # Fuse internal RepBlocks
