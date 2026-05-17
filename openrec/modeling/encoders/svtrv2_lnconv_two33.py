@@ -212,6 +212,43 @@ class RepBlock(nn.Module):
         return kernel * t, beta - running_mean * gamma / std
 
 
+class MoERepBlock(nn.Module):
+    """Degradation-Aware Mixture of Experts RepVGG Block (DA-MoE).
+    Router dynamically predicts weights to blend the output of two experts:
+    expert_clear and expert_blur.
+    """
+    def __init__(self, dim, act_layer=nn.GELU, **kwargs):
+        super().__init__()
+        self.expert_clear = RepBlock(dim, act_layer, **kwargs)
+        self.expert_blur = RepBlock(dim, act_layer, **kwargs)
+        
+        # Lightweight Router
+        self.router = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(dim, dim // 4, bias=False),
+            act_layer(),
+            nn.Linear(dim // 4, 2, bias=False),
+            nn.Softmax(dim=1)
+        )
+
+    def forward(self, x):
+        # x is [B, C, H, W]
+        weights = self.router(x) # [B, 2]
+        out_clear = self.expert_clear(x)
+        out_blur = self.expert_blur(x)
+        
+        weights = weights.view(-1, 2, 1, 1)
+        return weights[:, 0:1] * out_clear + weights[:, 1:2] * out_blur
+
+    def switch_to_deploy(self):
+        # Fuse internal RepBlocks
+        if hasattr(self.expert_clear, 'switch_to_deploy'):
+            self.expert_clear.switch_to_deploy()
+        if hasattr(self.expert_blur, 'switch_to_deploy'):
+            self.expert_blur.switch_to_deploy()
+
+
 class ConvBlock(nn.Module):
 
     def __init__(
@@ -359,13 +396,15 @@ class SVTRStage(nn.Module):
                     block = Block
                 elif mixer[i] == 'Rep':
                     block = RepBlock
+                elif mixer[i] == 'MoERep':
+                    block = MoERepBlock
                 elif mixer[i] == 'FGlobal':
                     block = Block
                     self.blocks.append(FlattenTranspose())
                 elif mixer[i] == 'FGlobalRe2D':
                     block = FlattenBlockRe2D
                 
-                if mixer[i] == 'Rep':
+                if mixer[i] in ('Rep', 'MoERep'):
                     self.blocks.append(
                         block(
                             dim=dim,
@@ -388,7 +427,7 @@ class SVTRStage(nn.Module):
                         ))
 
         if downsample:
-            if mixer[-1] in ('Conv', 'FGlobalRe2D', 'Rep'):
+            if mixer[-1] in ('Conv', 'FGlobalRe2D', 'Rep', 'MoERep'):
                 self.downsample = SubSample2D(dim, out_dim, stride=sub_k)
             else:
                 self.downsample = SubSample1D(dim, out_dim, stride=sub_k)
@@ -530,7 +569,7 @@ class SVTRv2LNConvTwo33(nn.Module):
                                  feat_max_size=feat_max_size,
                                  embed_dim=dims[0],
                                  use_pos_embed=use_pos_embed,
-                                 flatten=mixer[0][0] not in ('Conv', 'Rep'),
+                                 flatten=mixer[0][0] not in ('Conv', 'Rep', 'MoERep'),
                                  bias=pope_bias)
 
         dpr = np.linspace(0, drop_path_rate,
