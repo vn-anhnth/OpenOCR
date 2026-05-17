@@ -69,6 +69,14 @@ class Attention(nn.Module):
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
         x = attn @ v
+
+        # Use PyTorch native Memory-Efficient Attention (fused kernel)
+        # import torch.nn.functional as F
+        # x = F.scaled_dot_product_attention(
+        #     q, k, v,
+        #     dropout_p=self.attn_drop.p if self.training else 0.0
+        # )
+
         x = x.transpose(1, 2).reshape(B, N, self.dim)
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -140,6 +148,68 @@ class FlattenBlockRe2D(Block):
         x = super().forward(x)
         x = x.transpose(1, 2).reshape(B, C, H, W)
         return x
+
+
+class RepBlock(nn.Module):
+    """RepVGG Block for Hybrid-RepSVTR.
+    Training: Multi-branch (3x3, 1x1, Identity) for high capacity.
+    Inference: Fused into a single 3x3 Conv2d + GELU for ultra-fast latency.
+    """
+    def __init__(self, dim, act_layer=nn.GELU, **kwargs):
+        super().__init__()
+        self.in_channels = dim
+        self.out_channels = dim
+        self.stride = 1
+        
+        self.rbr_dense = nn.Sequential(
+            nn.Conv2d(dim, dim, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(dim)
+        )
+        self.rbr_1x1 = nn.Sequential(
+            nn.Conv2d(dim, dim, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(dim)
+        )
+        self.rbr_identity = nn.BatchNorm2d(dim)
+        self.act = act_layer()
+
+    def forward(self, x):
+        if hasattr(self, 'rbr_reparam'):
+            return self.act(self.rbr_reparam(x))
+        return self.act(self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x))
+
+    def switch_to_deploy(self):
+        if hasattr(self, 'rbr_reparam'):
+            return
+        kernel, bias = self.get_equivalent_kernel_bias()
+        self.rbr_reparam = nn.Conv2d(self.in_channels, self.out_channels, 3, 1, 1, bias=True)
+        self.rbr_reparam.weight.data = kernel
+        self.rbr_reparam.bias.data = bias
+        self.__delattr__('rbr_dense')
+        self.__delattr__('rbr_1x1')
+        self.__delattr__('rbr_identity')
+
+    def get_equivalent_kernel_bias(self):
+        kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_dense)
+        kernel1x1, bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
+        kernelid, biasid = self._fuse_bn_tensor(self.rbr_identity)
+        return kernel3x3 + torch.nn.functional.pad(kernel1x1, [1,1,1,1]) + kernelid, bias3x3 + bias1x1 + biasid
+
+    def _fuse_bn_tensor(self, branch):
+        if isinstance(branch, nn.Sequential):
+            kernel, bn = branch[0].weight, branch[1]
+        else:
+            bn = branch
+            kernel = torch.zeros((self.out_channels, self.in_channels, 3, 3), device=bn.weight.device)
+            for i in range(self.out_channels):
+                kernel[i, i, 1, 1] = 1.0
+        running_mean = bn.running_mean
+        running_var = bn.running_var
+        gamma = bn.weight
+        beta = bn.bias
+        eps = bn.eps
+        std = (running_var + eps).sqrt()
+        t = (gamma / std).reshape(-1, 1, 1, 1)
+        return kernel * t, beta - running_mean * gamma / std
 
 
 class ConvBlock(nn.Module):
@@ -287,28 +357,38 @@ class SVTRStage(nn.Module):
             else:
                 if mixer[i] == 'Global':
                     block = Block
+                elif mixer[i] == 'Rep':
+                    block = RepBlock
                 elif mixer[i] == 'FGlobal':
                     block = Block
                     self.blocks.append(FlattenTranspose())
                 elif mixer[i] == 'FGlobalRe2D':
                     block = FlattenBlockRe2D
-                self.blocks.append(
-                    block(
-                        dim=dim,
-                        num_heads=num_heads,
-                        mlp_ratio=mlp_ratio,
-                        qkv_bias=qkv_bias,
-                        qk_scale=qk_scale,
-                        drop=drop_rate,
-                        act_layer=act,
-                        attn_drop=attn_drop_rate,
-                        drop_path=drop_path[i],
-                        norm_layer=norm_layer,
-                        eps=eps,
-                    ))
+                
+                if mixer[i] == 'Rep':
+                    self.blocks.append(
+                        block(
+                            dim=dim,
+                            act_layer=act
+                        ))
+                else:
+                    self.blocks.append(
+                        block(
+                            dim=dim,
+                            num_heads=num_heads,
+                            mlp_ratio=mlp_ratio,
+                            qkv_bias=qkv_bias,
+                            qk_scale=qk_scale,
+                            drop=drop_rate,
+                            act_layer=act,
+                            attn_drop=attn_drop_rate,
+                            drop_path=drop_path[i],
+                            norm_layer=norm_layer,
+                            eps=eps,
+                        ))
 
         if downsample:
-            if mixer[-1] == 'Conv' or mixer[-1] == 'FGlobalRe2D':
+            if mixer[-1] in ('Conv', 'FGlobalRe2D', 'Rep'):
                 self.downsample = SubSample2D(dim, out_dim, stride=sub_k)
             else:
                 self.downsample = SubSample1D(dim, out_dim, stride=sub_k)
@@ -450,7 +530,7 @@ class SVTRv2LNConvTwo33(nn.Module):
                                  feat_max_size=feat_max_size,
                                  embed_dim=dims[0],
                                  use_pos_embed=use_pos_embed,
-                                 flatten=mixer[0][0] != 'Conv',
+                                 flatten=mixer[0][0] not in ('Conv', 'Rep'),
                                  bias=pope_bias)
 
         dpr = np.linspace(0, drop_path_rate,
