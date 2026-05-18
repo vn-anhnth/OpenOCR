@@ -162,11 +162,7 @@ class RepBlock(nn.Module):
         self.stride = 1
 
         self.rbr_dense = nn.Sequential(
-            nn.Conv2d(dim, dim, 5, 1, 2, bias=False),
-            nn.BatchNorm2d(dim)
-        )
-        self.rbr_3x3 = nn.Sequential(
-            nn.Conv2d(dim, dim, 3, 1, 1, bias=False),
+            nn.Conv2d(dim, dim, 7, 1, 3, bias=False),
             nn.BatchNorm2d(dim)
         )
         self.rbr_1x1 = nn.Sequential(
@@ -179,38 +175,35 @@ class RepBlock(nn.Module):
     def forward(self, x):
         if hasattr(self, 'rbr_reparam'):
             return self.act(self.rbr_reparam(x))
-        return self.act(self.rbr_dense(x) + self.rbr_3x3(x) + self.rbr_1x1(x) + self.rbr_identity(x))
+        return self.act(self.rbr_dense(x) + self.rbr_1x1(x) + self.rbr_identity(x))
 
     def switch_to_deploy(self):
         if hasattr(self, 'rbr_reparam'):
             return
         kernel, bias = self.get_equivalent_kernel_bias()
-        self.rbr_reparam = nn.Conv2d(self.in_channels, self.out_channels, 5, 1, 2, bias=True)
+        self.rbr_reparam = nn.Conv2d(self.in_channels, self.out_channels, 7, 1, 3, bias=True)
         self.rbr_reparam.weight.data = kernel
         self.rbr_reparam.bias.data = bias
         self.__delattr__('rbr_dense')
-        self.__delattr__('rbr_3x3')
         self.__delattr__('rbr_1x1')
         self.__delattr__('rbr_identity')
 
     def get_equivalent_kernel_bias(self):
-        kernel5x5, bias5x5 = self._fuse_bn_tensor(self.rbr_dense)
-        kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_3x3)
+        kernel7x7, bias7x7 = self._fuse_bn_tensor(self.rbr_dense)
         kernel1x1, bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
         kernelid, biasid = self._fuse_bn_tensor(self.rbr_identity)
-        
-        pad_3x3 = torch.nn.functional.pad(kernel3x3, [1, 1, 1, 1])
-        pad_1x1 = torch.nn.functional.pad(kernel1x1, [2, 2, 2, 2])
-        return kernel5x5 + pad_3x3 + pad_1x1 + kernelid, bias5x5 + bias3x3 + bias1x1 + biasid
+        kernel = kernel7x7 + torch.nn.functional.pad(kernel1x1, [3, 3, 3, 3]) + kernelid
+        bias = bias7x7 + bias1x1 + biasid
+        return kernel, bias
 
     def _fuse_bn_tensor(self, branch):
         if isinstance(branch, nn.Sequential):
             kernel, bn = branch[0].weight, branch[1]
         else:
             bn = branch
-            kernel = torch.zeros((self.out_channels, self.in_channels, 5, 5), device=bn.weight.device)
+            kernel = torch.zeros((self.out_channels, self.in_channels, 7, 7), device=bn.weight.device)
             for i in range(self.out_channels):
-                kernel[i, i, 2, 2] = 1.0
+                kernel[i, i, 3, 3] = 1.0
         running_mean = bn.running_mean
         running_var = bn.running_var
         gamma = bn.weight
