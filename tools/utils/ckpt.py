@@ -97,10 +97,10 @@ def load_pretrained_params(model, pretrained_model, logger):
         if k in model_state_dict:
             model_v = model_state_dict[k]
             if v.shape != model_v.shape:
-                if len(v.shape) == 4 and len(model_v.shape) == 4 and v.shape[2:] == (3, 3) and model_v.shape[2:] == (5, 5) and v.shape[:2] == model_v.shape[:2]:
-                    logger.info(f"Padding 3x3 weight to 5x5 for {k}")
+                if len(v.shape) == 4 and len(model_v.shape) == 4 and v.shape[2:] == (3, 3) and model_v.shape[2:] == (7, 7) and v.shape[:2] == model_v.shape[:2]:
+                    logger.info(f"Padding 3x3 weight to 7x7 for {k}")
                     import torch.nn.functional as F
-                    new_state_dict[k] = F.pad(v, (1, 1, 1, 1), "constant", 0)
+                    new_state_dict[k] = F.pad(v, (2, 2, 2, 2), "constant", 0)
                 else:
                     logger.info(f"Shape mismatch for {k}: model needs {model_v.shape}, checkpoint has {v.shape}. Skipping.")
             else:
