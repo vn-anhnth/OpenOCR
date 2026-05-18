@@ -23,7 +23,7 @@ Global:
 Optimizer:
   name: AdamW
   lr: 0.001
-  weight_decay: 0.05
+  weight_decay: 0.005
   filter_bias_and_bn: True
 
 LRScheduler:
