@@ -24,7 +24,7 @@ Optimizer:
   name: AdamW
   # lr: 0.00065 # for 4gpus bs256/gpu
   # weight_decay: 0.05
-  lr: 0.001
+  lr: 0.002
   weight_decay: 0.005
   filter_bias_and_bn: True
 
@@ -62,7 +62,7 @@ Architecture:
     dims: [64, 128, 256]
     depths: [3, 6, 3]
     num_heads: [2, 4, 8]
-    mixer: [['Rep','Rep','Rep'],['Rep','Rep','Rep','Rep','Rep','Rep'],['FGlobal','Global','Global']]
+    mixer: [['Rep','Rep','Rep'],['Rep','Rep','Rep','FGlobal','Global','Global'],['Global','Global','Global']]
     local_k: [[5, 5], [5, 5], [-1, -1]]
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
@@ -103,7 +103,7 @@ Train:
     name: RatioSampler
     scales: [[128, 32]] # w, h
     # divide_factor: to ensure the width and height dimensions can be devided by downsampling multiple
-    first_bs: &bs 256
+    first_bs: &bs 512
     fix_bs: false
     divided_factor: [4, 16] # w, h
     is_training: True
@@ -133,7 +133,7 @@ Eval:
     name: RatioSampler
     scales: [[128, 32]] # w, h
     # divide_factor: to ensure the width and height dimensions can be devided by downsampling multiple
-    first_bs: 256
+    first_bs: 512
     fix_bs: false
     divided_factor: [4, 16] # w, h
     is_training: False
