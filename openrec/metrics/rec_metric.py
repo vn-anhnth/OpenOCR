@@ -75,10 +75,33 @@ class RecMetric(object):
         norm_edit_dis = 0.0
         total_edit_dis = 0.0
         total_char_len = 0
-        for (pred, pred_conf), (target, _) in zip(preds, labels):
-            if self.stream:
-                assert len(labels) == 1
-                pred, _ = stream_match(preds)
+        debug_count = 0
+        
+        # Robust debug to see what the metric is actually receiving
+        if len(preds) > 0 and len(labels) > 0:
+            import sys
+            print(f"\n--- DEBUG METRIC START ---", file=sys.stderr)
+            print(f"Preds Type: {type(preds)} | Sample: {preds[0]}", file=sys.stderr)
+            print(f"Labels Type: {type(labels)} | Sample: {labels[0]}", file=sys.stderr)
+            print(f"--- DEBUG METRIC END ---\n", file=sys.stderr)
+
+        for pred_data, label_data in zip(preds, labels):
+            # Safe extraction of strings
+            if isinstance(pred_data, (list, tuple)):
+                pred = str(pred_data[0])
+            else:
+                pred = str(pred_data)
+                
+            if isinstance(label_data, (list, tuple)):
+                target = str(label_data[0])
+            else:
+                target = str(label_data)
+
+            if debug_count < 5:
+                import sys
+                print(f"COMPARE -> P: [{pred}] vs T: [{target}]", file=sys.stderr)
+                debug_count += 1
+            
             if self.ignore_space:
                 pred = pred.replace(' ', '')
                 target = target.replace(' ', '')
