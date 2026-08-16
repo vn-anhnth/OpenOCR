@@ -58,11 +58,11 @@ class SRNLabelDecode(BaseRecLabelDecode):
 
         if isinstance(preds, torch.Tensor):
             preds = preds.reshape([-1, self.max_len, preds.shape[-1]])
-            preds = preds.detach().cpu().numpy()
+            preds = preds.detach().cpu().float().numpy()
         else:
             preds = preds[-1]
             preds = preds.reshape([-1, self.max_len,
-                                   preds.shape[-1]]).detach().cpu().numpy()
+                                   preds.shape[-1]]).detach().cpu().float().numpy()
 
         preds_idx = preds.argmax(axis=2)
         preds_prob = preds.max(axis=2)

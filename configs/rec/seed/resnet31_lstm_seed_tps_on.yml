@@ -1,9 +1,9 @@
 Global:
   device: gpu
-  epoch_num: 20
+  epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/u14m_filter/resnet31_lstm_seed_tps_on
+  output_dir: ./output/rec/seed
   eval_epoch_step: [0, 1]
   eval_batch_step: [0, 500]
   cal_metric_during_train: True
@@ -15,7 +15,7 @@ Global:
   character_dict_path: ./tools/utils/EN_symbol_dict.txt
   max_text_length: 25
   use_space_char: False
-  save_res_path: ./output/rec/predicts_aster_tps.txt
+  save_res_path: ./output/rec/seed/predicts_aster_tps.txt
   use_amp: True
   grad_clip_val: 1.0
 
@@ -27,7 +27,7 @@ Optimizer:
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
+  warmup_epoch: 7.5 # pct_start 0.075*20 = 1.5ep
   cycle_momentum: False
 
 Architecture:
@@ -57,7 +57,7 @@ PostProcess:
 Train:
   dataset:
     name: LMDBDataSet
-    data_dir: ../Union14M-L-LMDB-Filtered
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/train_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -72,14 +72,14 @@ Train:
           keep_keys: ['image', 'label', 'length', 'fast_label'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 1024
+    batch_size_per_card: 256
     drop_last: True
     num_workers: 4
 
 Eval:
   dataset:
     name: LMDBDataSet
-    data_dir: ../evaluation
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/val_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB

@@ -28,6 +28,8 @@ class ArgsParser(ArgumentParser):
             return config
         for s in opts:
             s = s.strip()
+            if '=' not in s:
+                continue
             k, v = s.split('=', 1)
             if '.' not in k:
                 config[k] = yaml.load(v, Loader=yaml.Loader)

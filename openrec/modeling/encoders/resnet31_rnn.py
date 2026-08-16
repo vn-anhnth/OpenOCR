@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -117,7 +118,9 @@ class ResNet_ASTER(nn.Module):
         cnn_feat = x5.squeeze(2)  # [N, c, w]
         cnn_feat = cnn_feat.transpose(2, 1).contiguous()
         if self.with_lstm:
-            rnn_feat, _ = self.rnn(cnn_feat)
-            return rnn_feat
+            orig_dtype = cnn_feat.dtype
+            with torch.cuda.amp.autocast(enabled=False):
+                rnn_feat, _ = self.rnn(cnn_feat.float())
+            return rnn_feat.to(orig_dtype)
         else:
             return cnn_feat

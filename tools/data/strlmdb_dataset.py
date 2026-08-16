@@ -10,16 +10,16 @@ from openrec.preprocess import create_operators, transform
 
 class STRLMDBDataSet(Dataset):
 
-    def __init__(self, config, mode, logger, seed=None, epoch=1, gpu_i=0):
+    def __init__(self, config, mode, logger, seed=None, epoch=1, task='rec', **kwargs):
         super(STRLMDBDataSet, self).__init__()
 
         global_config = config['Global']
         dataset_config = config[mode]['dataset']
         loader_config = config[mode]['loader']
         loader_config['batch_size_per_card']
-        # data_dir = dataset_config['data_dir']
-        data_dir = '../training_aug_lmdb_noerror/ep' + str(
-            epoch % 20 if epoch % 20 != 0 else 20)
+        data_dir = dataset_config['data_dir']
+        # data_dir = '../training_aug_lmdb_noerror/ep' + str(
+        #     epoch % 20 if epoch % 20 != 0 else 20)
         self.do_shuffle = loader_config['shuffle']
 
         self.lmdb_sets = self.load_hierarchical_lmdb_dataset(data_dir)

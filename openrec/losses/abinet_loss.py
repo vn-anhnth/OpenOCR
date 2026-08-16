@@ -35,6 +35,7 @@ class ABINetLoss(nn.Module):
                 flt_logtis = logits.reshape([-1, logits.shape[2]])
                 flt_tgt = batch[1].reshape([-1])
 
+            flt_tgt = flt_tgt.long()
             loss[name + '_loss'] = self.loss_func(flt_logtis, flt_tgt) * (
                 self.align_weight if name == 'align' else 1.0)
             loss_sum.append(loss[name + '_loss'])
