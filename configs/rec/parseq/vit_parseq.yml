@@ -22,7 +22,7 @@ Global:
 
 Optimizer:
   name: AdamW
-  lr: 0.001485 # 2gpus 384bs/gpu
+  lr: 0.0005 # 2gpus 384bs/gpu
   weight_decay: 0.
   filter_bias_and_bn: False
 
