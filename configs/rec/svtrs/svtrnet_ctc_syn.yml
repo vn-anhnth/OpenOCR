@@ -1,6 +1,6 @@
 Global:
   device: gpu
-  epoch_num: 150
+  epoch_num: 100
   log_smooth_window: 20
   print_batch_step: 10
   output_dir: ./output/rec/svtr_tiny/
@@ -22,13 +22,13 @@ Global:
 
 Optimizer:
   name: AdamW
-  lr: 0.001 # for 4gpus bs256/gpu
+  lr: 0.0005 # for 4gpus bs256/gpu
   weight_decay: 0.05
   filter_bias_and_bn: True
 
 LRScheduler:
   name: CosineAnnealingLR
-  warmup_epoch: 10
+  warmup_epoch: 2
 
 Architecture:
   model_type: rec
