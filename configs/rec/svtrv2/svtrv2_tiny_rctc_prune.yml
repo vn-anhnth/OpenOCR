@@ -100,7 +100,7 @@ Eval:
     name: RatioDataSetTVResize
     ds_width: True
     padding: False
-    data_dir_list: ['/content/ocr-license-plate-lmdb-dataset/test_labels']
+    data_dir_list: ['/content/ocr-license-plate-lmdb-dataset/val_labels']
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
