@@ -63,7 +63,7 @@ def createDataset(data_list, outputPath, checkValid=True):
         checkValid : if true, check the validity of every image
     """
     os.makedirs(outputPath, exist_ok=True)
-    env = lmdb.open(outputPath, map_size=1099511627776)
+    env = lmdb.open(outputPath, map_size=2147483648)
     cache = {}
     cnt = 1
     for imagePath, label in tqdm(data_list,
@@ -98,22 +98,22 @@ def createDataset(data_list, outputPath, checkValid=True):
 
 
 if __name__ == '__main__':
-    data_dir = './Union14M-L/'
-    # downloading the filtered_label_list from https://drive.google.com/drive/folders/1x1LC8C_W-Frl3sGV9i9_i_OD-bqNdodJ?usp=drive_link
+    data_dir = r'D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset'
+
     label_file_list = [
-        './Union14M-L/train_annos/filter_jsonl_mmocr0.x/filter_train_challenging.jsonl.txt',
-        './Union14M-L/train_annos/filter_jsonl_mmocr0.x/filter_train_easy.jsonl.txt',
-        './Union14M-L/train_annos/filter_jsonl_mmocr0.x/filter_train_hard.jsonl.txt',
-        './Union14M-L/train_annos/filter_jsonl_mmocr0.x/filter_train_medium.jsonl.txt',
-        './Union14M-L/train_annos/filter_jsonl_mmocr0.x/filter_train_normal.jsonl.txt'
+        r'D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\train_labels.txt',
+        r'D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\val_labels.txt',
+        r'D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\test_labels.txt'
     ]
-    save_path_root = './Union14M-L-LMDB-Filtered/'
+    save_path_root = r'D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\lmdb_data\\'
 
     for data_list in label_file_list:
-        save_path = save_path_root + data_list.split('/')[-1].split(
-            '.')[0] + '/'
+        file_name = os.path.basename(data_list).split('.')[0]
+        save_path = os.path.join(save_path_root, file_name)
+
         os.makedirs(save_path, exist_ok=True)
-        print(save_path)
+        print(f"Creating LMDB dataset at: {save_path}")
+
         train_data_list = get_datalist(data_dir, data_list, 800)
 
         createDataset(train_data_list, save_path)

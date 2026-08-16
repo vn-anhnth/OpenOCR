@@ -19,7 +19,8 @@ class CPPDLabelDecode(NRTRLabelDecode):
             if isinstance(preds[-1], dict):
                 preds = preds[-1]['align'][-1].detach().cpu().numpy()
             else:
-                preds = preds[-1].detach().cpu().numpy()
+                preds = preds[-1].detach().float().cpu().numpy()
+                # preds = preds[-1].detach().cpu().numpy() # old
         if isinstance(preds, list):
             preds = preds[-1].detach().cpu().numpy()
         if isinstance(preds, torch.Tensor):

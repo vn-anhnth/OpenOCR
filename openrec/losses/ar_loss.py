@@ -12,7 +12,7 @@ class ARLoss(nn.Module):
         max_len = batch[2].max()
         tgt = batch[1][:, 1:2 + max_len]
         pred = pred.flatten(0, 1)
-        tgt = tgt.reshape([-1])
+        tgt = tgt.reshape([-1]).long()
         loss = F.cross_entropy(
             pred,
             tgt,

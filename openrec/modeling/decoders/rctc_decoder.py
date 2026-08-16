@@ -46,7 +46,11 @@ class RCTCDecoder(nn.Module):
         x_kv = self.fc_kv(x.flatten(2).transpose(1, 2)).reshape(
             B, H * W, 2, C).permute(2, 0, 3, 1)  # 2, b, c, hw
         x_k, x_v = x_kv.unbind(0)  # b, c, hw
-        char_token = self.char_token.tile([B, 1, 1])
+
+        # for building svtrv2 in tensorRT
+        # char_token = self.char_token.expand(B, -1, -1)
+        char_token = self.char_token.tile([B, 1, 1])  # old version
+
         attn_ctc2d = char_token @ x_k  # b, 1, hw
         attn_ctc2d = attn_ctc2d.reshape([-1, 1, H, W])
         attn_ctc2d = F.softmax(attn_ctc2d, 2)  # b, 1, h, w
@@ -57,6 +61,60 @@ class RCTCDecoder(nn.Module):
         feats = feats.squeeze(2)  # b, w, c
 
         predicts = self.fc(feats)
+
+        if self.return_feats:
+            result = (feats, predicts)
+        else:
+            result = predicts
+
+        if not self.training:
+            predicts = F.softmax(predicts, dim=2)
+            result = predicts
+
+        return result
+
+
+class EfficientRCTCDecoder(nn.Module):
+    """
+    Uses 1x1 Channel Fusion and Height-wise Average Pooling instead of heavy Attention.
+    """
+    def __init__(self,
+                 in_channels,
+                 out_channels=6625,
+                 bottleneck_channels=128,
+                 return_feats=False,
+                 **kwargs):
+        super(EfficientRCTCDecoder, self).__init__()
+
+        # 1x1 Channel Fusion (Bottleneck) to reduce parameters in Classifier
+        self.fusion = nn.Conv2d(
+            in_channels,
+            bottleneck_channels,
+            kernel_size=1,
+            bias=True
+        )
+
+        self.fc = nn.Linear(
+            bottleneck_channels,
+            out_channels,
+            bias=True,
+        )
+        self.out_channels = out_channels
+        self.return_feats = return_feats
+
+    def forward(self, x, data=None):
+        # x shape: [B, C, H, W] (e.g., [B, 256, 4, 32])
+
+        # 1. 1x1 Channel Fusion
+        x = self.fusion(x) # [B, 128, H, W]
+
+        # 2. Height-wise Average Pooling (Efficient way to squash height for ALPR)
+        # Instead of heavy Attention, we average features vertically.
+        feats = x.mean(dim=2) # [B, C, W]
+        feats = feats.permute(0, 2, 1) # [B, W, C]
+
+        # 3. Final Classification
+        predicts = self.fc(feats) # [B, W, out_channels]
 
         if self.return_feats:
             result = (feats, predicts)

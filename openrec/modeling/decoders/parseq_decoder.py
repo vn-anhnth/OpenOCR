@@ -489,7 +489,7 @@ class PARSeqDecoder(nn.Module):
             if i == 0:
                 final_out = logits
             loss += n * F.cross_entropy(logits.flatten(end_dim=1),
-                                        tgt_out.flatten(),
+                                        tgt_out.flatten().long(),
                                         ignore_index=self.pad_id)
             loss_numel += n
             # After the second iteration (i.e. done with canonical and reverse orderings),

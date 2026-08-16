@@ -3,12 +3,14 @@ Global:
   epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/svtrv2_tiny_rctc/
+  output_dir: ./output/rec/svtr26_tiny_rctc/
   save_epoch_step: [15, 10]
   # evaluation is run every 2000 iterations
   eval_epoch_step: [0, 10]
   eval_batch_step: [0, 500]
   cal_metric_during_train: True
+  # pretrained_model: "/content/SVTRv2_many/tiny/best.pth"
+  # pretrained_model: "D:/IEEE/data/phD/OpenOCR/output/rec/svtrv2_tiny_rctc_efficient/best.pth"
   pretrained_model:
   checkpoints:
   use_tensorboard: false
@@ -17,7 +19,7 @@ Global:
   character_dict_path: &character_dict_path D:/IEEE/data/phD/OpenOCR/tools/utils/license_plate_vn_dict.txt
   max_text_length: &max_text_length 25
   use_space_char: &use_space_char False
-  save_res_path: ./output/rec/predicts_svtrv2_rctc.txt
+  save_res_path: ./output/rec/svtr26_tiny_rctc/predicts_svtrv2_rctc.txt
   use_amp: True
 
 Optimizer:
@@ -28,7 +30,7 @@ Optimizer:
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 7.5 # pct_start 0.075*20 = 1.5ep
+  warmup_epoch: 7.5
   cycle_momentum: False
 
 Architecture:
@@ -42,12 +44,13 @@ Architecture:
     depths: [3, 6, 3]
     num_heads: [2, 4, 8]
     mixer: [['Conv','Conv','Conv'],['Conv','Conv','Conv','FGlobal','Global','Global'],['Global','Global','Global']]
-    local_k: [[5, 5], [5, 5], [-1, -1]]
+    # local_k: [[5, 5], [5, 5], [-1, -1]] ko có thấy dùng
     sub_k: [[1, 1], [2, 1], [-1, -1]]
     last_stage: false
     feat2d: True
   Decoder:
-    name: RCTCDecoder
+    name: EfficientRCTCDecoder
+    bottleneck_channels: 128
 
 Loss:
   name: CTCLoss
@@ -126,8 +129,8 @@ Eval:
     # num_workers: 4
     num_workers: 0
 
-# python tools/train_rec.py -c configs/rec/svtrv2/svtrv2_tiny_rctc.yml
-# python tools/eval_rec.py -c configs/rec/svtrv2/svtrv2_tiny_rctc.yml -o Global.checkpoints="D:\IEEE\data\phD\OpenOCR\output\rec\svtrv2_tiny_rctc\best.pth"
-# acc:0.737759999704896
-# cer:0.07992967425207716
-# fps:14148.18259965785
+# python tools/train_rec.py -c configs/rec/svtrv2/svtrv2_tiny_rctc_prune.yml
+# python tools/eval_rec.py -c configs/rec/svtrv2/svtrv2_tiny_rctc_prune.yml -o Global.checkpoints="D:\IEEE\data\phD\OpenOCR\output\rec\svtr26_tiny_rctc\best.pth"
+# acc:0.764319999694272
+# cer:0.07285128510143107
+# fps:15057.85473361089

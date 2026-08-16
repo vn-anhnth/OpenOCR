@@ -47,3 +47,5 @@ env/
 extract_student.py
 pretrained_models/
 train_data_lmdb/
+train_data_lmdb_old/
+scratch/

@@ -1,23 +1,23 @@
 Global:
   device: gpu
-  epoch_num: 100
+  epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/ch/repsvtr_ch/
-  save_epoch_step: [150, 10]
+  output_dir: ./output/rec/repsvtr_ch/
+  save_epoch_step: [15, 10]
   # evaluation is run every 2000 iterations
-  eval_epoch_step: [0, 1]
+  eval_epoch_step: [0, 10]
   eval_batch_step: [0, 2000]
   cal_metric_during_train: True
-  pretrained_model: ./openocr_repsvtr_ch.pth
+  pretrained_model:
   checkpoints:
   use_tensorboard: false
   infer_img:
   # for data or label process
-  character_dict_path: &character_dict_path ./tools/utils/ppocr_keys_v1.txt
+  character_dict_path: &character_dict_path D:/IEEE/data/phD/OpenOCR/tools/utils/license_plate_vn_dict.txt
   max_text_length: &max_text_length 25
   use_space_char: &use_space_char True
-  save_res_path: ./output/rec/u14m_filter/predicts_svtrv2_ctc.txt
+  save_res_path: ./output/rec/repsvtr_ch/predicts_svtrv2_ctc.txt
   use_amp: True
   project_name: resvtr_ctc_nosgm_ds
 
@@ -63,9 +63,9 @@ Metric:
 Train:
   dataset:
     name: SimpleDataSet
-    data_dir: ../ic15_data/
+    data_dir: D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset
     label_file_list:
-      - ../ic15_data/rec_gt_train.txt
+    - D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\train_labels.txt
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -83,14 +83,14 @@ Train:
     shuffle: True
     batch_size_per_card: 256
     drop_last: True
-    num_workers: 4
+    num_workers: 0
 
 Eval:
   dataset:
     name: SimpleDataSet
-    data_dir: ../ic15_data/
+    data_dir: D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset
     label_file_list:
-      - ../ic15_data/rec_gt_test.txt
+    - D:\IEEE\data\phD\data\50k_OCR\aaa_train_ne_version_5\ocr-license-plate-dataset\val_labels.txt
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -110,4 +110,6 @@ Eval:
     shuffle: False
     drop_last: False
     batch_size_per_card: 1
-    num_workers: 4
+    num_workers: 0
+
+# python tools/train_rec.py -c configs/rec/svtrv2/repsvtr_ch.yml

@@ -11,7 +11,7 @@ class SRNLoss(nn.Module):
     def forward(self, preds, batch):
         pvam_preds, gsrm_preds, vsfd_preds = preds
 
-        label = batch[1].reshape([-1])
+        label = batch[1].reshape([-1]).long()
 
         ignore_index = pvam_preds.shape[-1] + 1
 

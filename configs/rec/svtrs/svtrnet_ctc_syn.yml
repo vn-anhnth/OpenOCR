@@ -1,10 +1,11 @@
 Global:
   device: gpu
-  epoch_num: 20
+  epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/syn/svtr_tiny/
-  eval_epoch_step: [0, 1]
+  output_dir: ./output/rec/svtr_tiny/
+  save_epoch_step: [15, 10]
+  eval_epoch_step: [0, 10]
   eval_batch_step: [0, 500]
   cal_metric_during_train: True
   pretrained_model:
@@ -12,22 +13,22 @@ Global:
   use_tensorboard: false
   infer_img:
   # for data or label process
-  character_dict_path: &character_dict_path ./tools/utils/EN_symbol_dict.txt # 96en
+  character_dict_path: &character_dict_path D:/IEEE/data/phD/OpenOCR/tools/utils/license_plate_vn_dict.txt
   # ./tools/utils/ppocr_keys_v1.txt  # ch
   max_text_length: &max_text_length 25
   use_space_char: &use_space_char False
-  save_res_path: ./output/rec/syn/predicts_svtr_tiny.txt
+  save_res_path: ./output/rec/svtr_tiny/predicts_svtr_tiny.txt
   use_amp: True
 
 Optimizer:
   name: AdamW
-  lr: 0.0005 # for 4gpus bs256/gpu
+  lr: 0.001 # for 4gpus bs256/gpu
   weight_decay: 0.05
   filter_bias_and_bn: True
 
 LRScheduler:
   name: CosineAnnealingLR
-  warmup_epoch: 2
+  warmup_epoch: 10
 
 Architecture:
   model_type: rec
@@ -65,7 +66,7 @@ Metric:
 Train:
   dataset:
     name: STRLMDBDataSet
-    data_dir: ./
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/train_labels'
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -85,12 +86,12 @@ Train:
     shuffle: True
     batch_size_per_card: 256
     drop_last: True
-    num_workers: 8
+    num_workers: 0
 
 Eval:
   dataset:
     name: LMDBDataSet
-    data_dir: ../evaluation/
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/val_labels'
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -108,4 +109,10 @@ Eval:
     shuffle: False
     drop_last: False
     batch_size_per_card: 256
-    num_workers: 2
+    num_workers: 0
+
+# python tools/train_rec.py -c configs/rec/svtrs/svtrnet_ctc_syn.yml
+# python tools/eval_rec.py -c configs/rec/svtrs/svtrnet_ctc_syn.yml -o Global.checkpoints="D:\IEEE\data\phD\OpenOCR\output\rec\svtr_tiny\best.pth"
+# acc:0.70239999971904
+# cer:0.10537820222444493
+# fps:16718.007504621633
