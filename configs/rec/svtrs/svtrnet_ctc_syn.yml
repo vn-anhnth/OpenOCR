@@ -28,7 +28,7 @@ Optimizer:
 
 LRScheduler:
   name: CosineAnnealingLR
-  warmup_epoch: 2
+  warmup_epoch: 7.5
 
 Architecture:
   model_type: rec
@@ -86,7 +86,7 @@ Train:
     shuffle: True
     batch_size_per_card: 256
     drop_last: True
-    num_workers: 0
+    num_workers: 8
 
 Eval:
   dataset:
@@ -109,7 +109,7 @@ Eval:
     shuffle: False
     drop_last: False
     batch_size_per_card: 256
-    num_workers: 0
+    num_workers: 2
 
 # python tools/train_rec.py -c configs/rec/svtrs/svtrnet_ctc_syn.yml
 # python tools/eval_rec.py -c configs/rec/svtrs/svtrnet_ctc_syn.yml -o Global.checkpoints="D:\IEEE\data\phD\OpenOCR\output\rec\svtr_tiny\best.pth"

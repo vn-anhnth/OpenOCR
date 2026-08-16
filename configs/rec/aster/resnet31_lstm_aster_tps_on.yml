@@ -1,6 +1,6 @@
 Global:
   device: gpu
-  epoch_num: 150
+  epoch_num: 100
   log_smooth_window: 20
   print_batch_step: 10
   output_dir: ./output/rec/aster
@@ -72,7 +72,7 @@ Train:
     shuffle: True
     batch_size_per_card: 1024
     drop_last: True
-    num_workers: 0
+    num_workers: 4
 
 Eval:
   dataset:
@@ -91,6 +91,6 @@ Eval:
     shuffle: False
     drop_last: False
     batch_size_per_card: 256
-    num_workers: 0
+    num_workers: 2
 
 # python tools/train_rec.py -c configs/rec/aster/resnet31_lstm_aster_tps_on.yml

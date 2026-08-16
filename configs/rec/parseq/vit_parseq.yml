@@ -76,7 +76,7 @@ Train:
     shuffle: True
     batch_size_per_card: 384
     drop_last: True
-    num_workers: 0
+    num_workers: 4
 
 Eval:
   dataset:
@@ -98,6 +98,6 @@ Eval:
     shuffle: False
     drop_last: False
     batch_size_per_card: 256
-    num_workers: 0
+    num_workers: 2
 
 # python tools/train_rec.py -c configs/rec/parseq/vit_parseq.yml
