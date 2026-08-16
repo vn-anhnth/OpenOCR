@@ -1,10 +1,11 @@
 Global:
   device: gpu
-  epoch_num: 20
+  epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/u14m_filter/resnet31_lstm_sar
-  eval_epoch_step: [0, 1]
+  output_dir: ./output/rec/sar
+  save_epoch_step: [15, 10]
+  eval_epoch_step: [0, 10]
   eval_batch_step: [0, 500]
   cal_metric_during_train: True
   pretrained_model:
@@ -12,10 +13,10 @@ Global:
   use_tensorboard: false
   infer_img:
   # for data or label process
-  character_dict_path: ./tools/utils/EN_symbol_dict.txt
+  character_dict_path: &character_dict_path ./tools/utils/license_plate_vn_dict.txt
   max_text_length: 25
   use_space_char: False
-  save_res_path: ./output/rec/u14m_filter/predicts_resnet31_lstm_sar.txt
+  save_res_path: ./output/rec/sar/predicts_resnet31_lstm_sar.txt
   use_amp: True
   grad_clip_val: 1.0
 
@@ -27,7 +28,7 @@ Optimizer:
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
+  warmup_epoch: 7.5 # pct_start 0.075*20 = 1.5ep
   cycle_momentum: False
 
 Architecture:
@@ -55,7 +56,7 @@ Metric:
 Train:
   dataset:
     name: LMDBDataSet
-    data_dir: ../Union14M-L-LMDB-Filtered
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/train_labels'
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -76,7 +77,7 @@ Train:
 Eval:
   dataset:
     name: LMDBDataSet
-    data_dir: ../evaluation
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/val_labels'
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -92,3 +93,5 @@ Eval:
     drop_last: False
     batch_size_per_card: 256
     num_workers: 2
+
+# python tools/train_rec.py -c configs/rec/sar/resnet31_lstm_sar.yml
