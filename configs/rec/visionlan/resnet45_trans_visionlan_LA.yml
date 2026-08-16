@@ -1,10 +1,11 @@
 Global:
   device: gpu
-  epoch_num: 20
+  epoch_num: 100
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/u14m_filter/resnet45_trans_visionlan_LA/
-  eval_epoch_step: [0, 1]
+  output_dir: ./output/rec/VisionLAN/
+  eval_epoch_step: [0, 10]
+  save_epoch_step: [15, 10]
   eval_batch_step: [0, 500]
   cal_metric_during_train: True
   pretrained_model:
@@ -13,11 +14,11 @@ Global:
   use_tensorboard: false
   infer_img:
   # for data or label process
-  character_dict_path: &character_dict_path ./tools/utils/EN_symbol_dict.txt # 96en
+  character_dict_path: &character_dict_path ./tools/utils/license_plate_vn_dict.txt
   # ./tools/utils/ppocr_keys_v1.txt  # ch
   max_text_length: &max_text_length 25
   use_space_char: &use_space_char False
-  save_res_path: ./output/rec/u14m_filter/predicts_resnet45_trans_visionlan_LA.txt
+  save_res_path: ./output/rec/VisionLAN/predicts_resnet45_trans_visionlan_LA.txt
   grad_clip_val: 20
   use_amp: True
 
@@ -60,7 +61,7 @@ Metric:
 Train:
   dataset:
     name: LMDBDataSet
-    data_dir: ../Union14M-L-LMDB-Filtered
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/train_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -83,7 +84,7 @@ Train:
 Eval:
   dataset:
     name: LMDBDataSet
-    data_dir: ../evaluation
+    data_dir: 'D:/IEEE/data/phD/data/50k_OCR/aaa_train_ne_version_5/ocr-license-plate-dataset/lmdb_data/val_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -101,3 +102,5 @@ Eval:
     drop_last: False
     batch_size_per_card: 128
     num_workers: 2
+
+# python tools/train_rec.py -c configs/rec/visionlan/resnet45_trans_visionlan_LA.yml
