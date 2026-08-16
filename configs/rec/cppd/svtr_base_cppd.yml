@@ -1,25 +1,25 @@
 Global:
   device: gpu
-  epoch_num: 20
+  epoch_num: 150
   log_smooth_window: 20
   print_batch_step: 10
-  output_dir: ./output/rec/u14m_filter/svtr_base_cppd/
-  save_epoch_step: [15, 1]
+  output_dir: ./output/rec/cppd/
+  save_epoch_step: [15, 10]
   # evaluation is run every 2000 iterations
   eval_batch_step: [0, 500]
-  eval_epoch_step: [0, 1]
+  eval_epoch_step: [0, 10]
   cal_metric_during_train: True
   pretrained_model:
   checkpoints:
   use_tensorboard: false
   infer_img:
   # for data or label process
-  character_dict_path: &character_dict_path
+  character_dict_path: &character_dict_path ./tools/utils/license_plate_vn_dict.txt
   # ./tools/utils/EN_symbol_dict.txt # 96en
   # ./tools/utils/ppocr_keys_v1.txt  # ch
   max_text_length: &max_text_length 25
   use_space_char: &use_space_char False
-  save_res_path: ./output/rec/u14m_filter/predicts_svtr_base_cppd.txt
+  save_res_path: ./output/rec/cppd/predicts_svtr_base_cppd.txt
   use_amp: True
 
 Optimizer:
@@ -30,7 +30,7 @@ Optimizer:
 
 LRScheduler:
   name: OneCycleLR
-  warmup_epoch: 1.5 # pct_start 0.075*20 = 1.5ep
+  warmup_epoch: 7.5 # pct_start 0.075*20 = 1.5ep
   cycle_momentum: False
 
 Architecture:
@@ -78,7 +78,7 @@ Metric:
 Train:
   dataset:
     name: LMDBDataSet
-    data_dir: ../Union14M-L-LMDB-Filtered
+    data_dir: '/content/ocr-license-plate-lmdb-dataset/train_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
@@ -102,7 +102,7 @@ Train:
 Eval:
   dataset:
     name: LMDBDataSet
-    data_dir: ../evaluation/
+    data_dir: '/content/ocr-license-plate-lmdb-dataset/val_labels'
     transforms:
       - DecodeImagePIL: # load image
           img_mode: RGB
