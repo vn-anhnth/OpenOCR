@@ -34,7 +34,7 @@ class VisionLANLoss(nn.Module):
         self.training_step = training_step
 
     def forward(self, pred, batch):
-        text_pre, text_rem, text_mas, _ = pred
+        text_pre, text_rem, text_mas = pred
         target = batch[1].to(dtype=torch.int64)
         label_flatten, length = flatten_label(target)
         text_pre = _flatten(text_pre, length)
